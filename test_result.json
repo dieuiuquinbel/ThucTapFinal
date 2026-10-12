@@ -1,0 +1,53 @@
+﻿{
+    "answer":  "7 táº§ng [TÃªn file, Trang 2]",
+    "sources":  [
+                    {
+                        "source":  "ChuÌoÌng 2_KieÌÌn truÌc phaÌn taÌÌng.pdf",
+                        "page":  19,
+                        "score":  0.7595,
+                        "snippet":  "â¢ \nÆ¯u Äiá»m: \no ÄÆ¡n giáº£n hÆ¡n mÃ´ hÃ¬nh OSI, dá»\u0085 hiá»u vÃ  dá»\u0085 triá»n khai. \no ÄÆ°á»£c sá»­ dá»¥ng rá»ng rÃ£i trong thá»±c táº¿, cÃ³ nhiá»u tÃ i liá»u há» trá»£. \nâ¢ \nHáº¡n cháº¿: \no KhÃ´ng ÄÆ°á»£c tiÃªu chuáº©n hÃ³a Äáº§y Ä..."
+                    },
+                    {
+                        "source":  "ChuÌoÌng 2_KieÌÌn truÌc phaÌn taÌÌng.pdf",
+                        "page":  2,
+                        "score":  0.7453,
+                        "snippet":  "nhau náº¿u chÃºng tuÃ¢n theo cÃ¹ng má»t giao thá»©c á» má»t táº§ng cá»¥ thá». \n1.2. MÃ´ hÃ¬nh káº¿t ná»i cÃ¡c há» thá»ng má» OSI (Open Systems Interconnection) \nâ¢ \nLÃ  má»t mÃ´ hÃ¬nh kiáº¿n trÃºc phÃ¢n táº§ng ÄÆ°á»£c ..."
+                    }
+                ],
+    "raw_retrieved":  [
+                          {
+                              "text":  "â¢ \nÆ¯u Äiá»m: \no ÄÆ¡n giáº£n hÆ¡n mÃ´ hÃ¬nh OSI, dá»\u0085 hiá»u vÃ  dá»\u0085 triá»n khai. \no ÄÆ°á»£c sá»­ dá»¥ng rá»ng rÃ£i trong thá»±c táº¿, cÃ³ nhiá»u tÃ i liá»u há» trá»£. \nâ¢ \nHáº¡n cháº¿: \no KhÃ´ng ÄÆ°á»£c tiÃªu chuáº©n hÃ³a Äáº§y Äá»§ nhÆ° mÃ´ hÃ¬nh OSI, dáº«n Äáº¿n sá»± khÃ¡c biá»t vá» triá»n khai giá»¯a \ncÃ¡c nhÃ  cung cáº¥p.",
+                              "metadata":  {
+                                               "file_path":  "ChuÌoÌng 2_KieÌÌn truÌc phaÌn taÌÌng.pdf",
+                                               "chunk_id":  "ChuÌoÌng 2_KieÌÌn truÌc phaÌn taÌÌng.pdf_p19_c4",
+                                               "source":  "ChuÌoÌng 2_KieÌÌn truÌc phaÌn taÌÌng.pdf",
+                                               "total_pages":  21,
+                                               "char_length":  257,
+                                               "page":  19,
+                                               "chunk_index":  66
+                                           },
+                              "score":  0.7595,
+                              "page":  19,
+                              "source":  "ChuÌoÌng 2_KieÌÌn truÌc phaÌn taÌÌng.pdf"
+                          },
+                          {
+                              "text":  "nhau náº¿u chÃºng tuÃ¢n theo cÃ¹ng má»t giao thá»©c á» má»t táº§ng cá»¥ thá». \n1.2. MÃ´ hÃ¬nh káº¿t ná»i cÃ¡c há» thá»ng má» OSI (Open Systems Interconnection) \nâ¢ \nLÃ  má»t mÃ´ hÃ¬nh kiáº¿n trÃºc phÃ¢n táº§ng ÄÆ°á»£c phÃ¡t triá»n bá»i Tá» chá»©c TiÃªu chuáº©n hÃ³a quá»c táº¿ (ISO). \nâ¢ \nChia máº¡ng mÃ¡y tÃ­nh thÃ nh 7 táº§ng, má»i táº§ng cÃ³ chá»©c nÄng riÃªng biá»t, táº¡o nÃªn má»t chu trÃ¬nh truyá»n \nthÃ´ng hoÃ n chá»nh. \nâ¢ \nMÃ´ hÃ¬nh OSI lÃ  ná»n táº£ng lÃ½ thuyáº¿t cho nhiá»u cÃ´ng nghá» máº¡ng hiá»n Äáº¡i, cháº³ng háº¡n nhÆ°: \no TCP/IP: MÃ´ hÃ¬nh máº¡ng phá» biáº¿n nháº¥t hiá»n nay, ÄÆ°á»£c sá»­ dá»¥ng trong máº¡ng Internet. \no Ethernet: CÃ´ng nghá» máº¡ng LAN phá» biáº¿n nháº¥t. \no Wi-Fi: CÃ´ng nghá» máº¡ng khÃ´ng dÃ¢y phá» biáº¿n. \nâ¢ \nMÃ´ hÃ¬nh OSI giÃºp chÃºng ta hiá»u rÃµ cÃ¡ch thá»©c hoáº¡t Äá»ng cá»§a máº¡ng mÃ¡y tÃ­nh vÃ  cÃ¡ch cÃ¡c thiáº¿t bá» \nmáº¡ng giao tiáº¿p vá»i nhau, táº¡o ná»n táº£ng cho viá»c phÃ¡t triá»n cÃ¡c á»©ng dá»¥ng máº¡ng má»i.",
+                              "metadata":  {
+                                               "char_length":  792,
+                                               "chunk_index":  6,
+                                               "chunk_id":  "ChuÌoÌng 2_KieÌÌn truÌc phaÌn taÌÌng.pdf_p2_c3",
+                                               "page":  2,
+                                               "file_path":  "ChuÌoÌng 2_KieÌÌn truÌc phaÌn taÌÌng.pdf",
+                                               "total_pages":  21,
+                                               "source":  "ChuÌoÌng 2_KieÌÌn truÌc phaÌn taÌÌng.pdf"
+                                           },
+                              "score":  0.7453,
+                              "page":  2,
+                              "source":  "ChuÌoÌng 2_KieÌÌn truÌc phaÌn taÌÌng.pdf"
+                          }
+                      ],
+    "model_used":  "qwen2.5:7b",
+    "is_fallback":  false,
+    "latency_sec":  3.68,
+    "success":  true
+}

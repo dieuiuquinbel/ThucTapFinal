@@ -1,0 +1,9 @@
+﻿MÃ´ hÃ¬nh OSI chia máº¡ng mÃ¡y tÃ­nh thÃ nh 7 táº§ng vá»i chá»©c nÄng cá»§a tá»«ng táº§ng nhÆ° sau:
+
+1. Táº§ng váº­t lÃ½: Äá»nh nghÄ©a cÃ¡c Äáº·c Äiá»m vá» Äiá»n tá»« vÃ  cÆ¡ há»c cho phÃ©p truyá»n thÃ´ng qua ÄÆ°á»ng dáº«n.
+2. Táº§ng liÃªn káº¿t dá»¯ liá»u: Xá»­ lÃ½ viá»c gá»­i vÃ  nháº­n dá»¯ liá»u giá»¯a hai há» thá»ng máº¡ng.
+3. Táº§ng máº¡ng: Quáº£n lÃ½ Äá»a chá», phÃ¢n phá»i gÃ³i tin vÃ  kiá»m soÃ¡t truy cáº­p vÃ o tÃ i nguyÃªn máº¡ng.
+4. Táº§ng transport: Äáº£m báº£o sá»± truyá»n táº£i tin nháº¯n tá»« nguá»n Äáº¿n ÄÃ­ch má»t cÃ¡ch ÄÃ¡ng tin cáº­y.
+5. Táº§ng session: Thiáº¿t láº­p, quáº£n lÃ½ vÃ  giáº£i thá» cÃ¡c phiÃªn giao tiáº¿p giá»¯a hai há» thá»ng.
+6. Táº§ng presentation: Xá»­ lÃ½ mÃ£ hÃ³a/Äiá»u chá»nh dá»¯ liá»u Äá» phÃ¹ há»£p vá»i yÃªu cáº§u cá»§a á»©ng dá»¥ng.
+7. Táº§ng á»©ng dá»¥ng: Cung cáº¥p dá»ch vá»¥ cho cÃ¡c á»©ng dá»¥ng

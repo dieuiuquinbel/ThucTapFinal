@@ -1,0 +1,42 @@
+﻿{
+    "answer":  "KhÃ´ng tÃ¬m tháº¥y thÃ´ng tin phÃ¹ há»£p trong tÃ i liá»u ÄÃ£ táº£i lÃªn.",
+    "sources":  [
+
+                ],
+    "raw_retrieved":  [
+                          {
+                              "text":  "TÃ i liá»u tham kháº£o â NCS.ThS.LÃª Ngá»c An \n \n3.3.3.2. Vai trÃ² quan trá»ng cá»§a Táº§ng PhiÃªn \nâ¢ Quáº£n lÃ½ phiÃªn giao tiáº¿p: Táº§ng PhiÃªn Äáº£m báº£o ráº±ng cÃ¡c phiÃªn giao tiáº¿p ÄÆ°á»£c thiáº¿t láº­p vÃ  cháº¥m dá»©t \nmá»t cÃ¡ch hiá»u quáº£, trÃ¡nh tÃ¬nh tráº¡ng cÃ¡c thiáº¿t bá» bá» treo hoáº·c bá» lá»i. \nâ¢ Báº£o Äáº£m truyá»n dá»¯ liá»u chÃ­nh xÃ¡c: Táº§ng PhiÃªn sá»­ dá»¥ng cÃ¡c cÆ¡ cháº¿ kiá»m soÃ¡t luá»ng vÃ  Äá»ng bá» hÃ³a \nÄá» báº£o Äáº£m ráº±ng dá»¯ liá»u ÄÆ°á»£c truyá»n Äi má»t cÃ¡ch chÃ­nh xÃ¡c vÃ  Äáº§y Äá»§. \nâ¢ Cáº£i thiá»n hiá»u suáº¥t máº¡ng: Táº§ng PhiÃªn giÃºp cáº£i thiá»n hiá»u suáº¥t máº¡ng báº±ng cÃ¡ch Äiá»u khiá»n luá»ng dá»¯ \nliá»u, trÃ¡nh tÃ¬nh tráº¡ng máº¡ng bá» quÃ¡ táº£i. \n3.3.3.3. CÃ¡c dá»ch vá»¥ cá»§a Táº§ng PhiÃªn \nâ¢ Thiáº¿t láº­p vÃ  cháº¥m dá»©t káº¿t ná»i: Táº§ng PhiÃªn cÃ³ thá» thiáº¿t láº­p káº¿t ná»i giá»¯a hai thiáº¿t bá» máº¡ng báº±ng cÃ¡ch \nsá»­ dá»¥ng cÃ¡c giao thá»©c nhÆ° TCP hoáº·c UDP do táº§ng Transport cung cáº¥p.",
+                              "metadata":  {
+                                               "chunk_id":  "ChuÌoÌng 2_KieÌÌn truÌc phaÌn taÌÌng.pdf_p12_c1",
+                                               "char_length":  772,
+                                               "chunk_index":  39,
+                                               "page":  12,
+                                               "total_pages":  21,
+                                               "source":  "ChuÌoÌng 2_KieÌÌn truÌc phaÌn taÌÌng.pdf",
+                                               "file_path":  "ChuÌoÌng 2_KieÌÌn truÌc phaÌn taÌÌng.pdf"
+                                           },
+                              "score":  0.7663,
+                              "page":  12,
+                              "source":  "ChuÌoÌng 2_KieÌÌn truÌc phaÌn taÌÌng.pdf"
+                          },
+                          {
+                              "text":  "o Káº¿t ná»i váº­t lÃ½: cÃ¡c loáº¡i káº¿t ná»i ÄÆ°á»£c sá»­ dá»¥ng (vÃ­ dá»¥: RJ-45, BNC, SC...) \n3.3.7.2. Vai trÃ² cá»§a táº§ng Physical \nâ¢ Káº¿t ná»i cÃ¡c thiáº¿t bá» máº¡ng: Táº§ng Physical lÃ  cáº§u ná»i váº­t lÃ½ giá»¯a cÃ¡c thiáº¿t bá» máº¡ng, cho phÃ©p chÃºng \ngiao tiáº¿p vá»i nhau. \nâ¢ Äáº£m báº£o truyá»n táº£i hiá»u quáº£: Táº§ng Physical Äáº£m báº£o tÃ­n hiá»u ÄÆ°á»£c truyá»n táº£i má»t cÃ¡ch chÃ­nh xÃ¡c vÃ  \nhiá»u quáº£ qua mÃ´i trÆ°á»ng truyá»n dáº«n. \nâ¢ Táº§ng Physical cung cáº¥p cÃ¡c tiÃªu chuáº©n vÃ  quy Äá»nh vá» cÃ¡c Äáº·c tÃ­nh váº­t lÃ½ cá»§a truyá»n dáº«n, giÃºp Äáº£m \nbáº£o sá»± tÆ°Æ¡ng thÃ­ch giá»¯a cÃ¡c thiáº¿t bá» máº¡ng tá»« cÃ¡c nhÃ  sáº£n xuáº¥t khÃ¡c nhau. \n3.3.7.3. CÃ¡c thÃ nh pháº§n chÃ­nh cá»§a Táº§ng Physical: \nâ¢ PhÆ°Æ¡ng tiá»n váº­t lÃ½ Äá» truyá»n tÃ­n hiá»u, bao gá»m cÃ¡p Äá»ng, cÃ¡p quang, sÃ³ng vÃ´ tuyáº¿n, v.v. \nâ¢ Giao diá»n váº­t lÃ½: CÃ¡c káº¿t ná»i váº­t lÃ½ giá»¯a cÃ¡c thiáº¿t bá» máº¡ng, bao gá»m Äáº§u ná»i, cÃ¡p vÃ  cÃ¡c giao thá»©c",
+                              "metadata":  {
+                                               "chunk_index":  61,
+                                               "file_path":  "ChuÌoÌng 2_KieÌÌn truÌc phaÌn taÌÌng.pdf",
+                                               "total_pages":  21,
+                                               "char_length":  788,
+                                               "page":  18,
+                                               "chunk_id":  "ChuÌoÌng 2_KieÌÌn truÌc phaÌn taÌÌng.pdf_p18_c2",
+                                               "source":  "ChuÌoÌng 2_KieÌÌn truÌc phaÌn taÌÌng.pdf"
+                                           },
+                              "score":  0.7633,
+                              "page":  18,
+                              "source":  "ChuÌoÌng 2_KieÌÌn truÌc phaÌn taÌÌng.pdf"
+                          }
+                      ],
+    "model_used":  "qwen2.5:7b",
+    "is_fallback":  false,
+    "latency_sec":  19.9,
+    "success":  true
+}

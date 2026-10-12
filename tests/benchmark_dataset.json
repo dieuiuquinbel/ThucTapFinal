@@ -1,0 +1,92 @@
+[
+  {
+    "id": 1,
+    "query": "Khái niệm về kiến trúc phân tầng",
+    "target_page": 2,
+    "keyword_anchor": "phương pháp thiết kế hệ thống mạng phức tạp thành các lớp"
+  },
+  {
+    "id": 2,
+    "query": "Mục tiêu bài giảng chương kiến trúc phân tầng và mô hình OSI",
+    "target_page": 1,
+    "keyword_anchor": "Hiểu được khái niệm về kiến trúc phân tầng"
+  },
+  {
+    "id": 3,
+    "query": "Mô hình OSI chia mạng thành bao nhiêu tầng?",
+    "target_page": 2,
+    "keyword_anchor": "Chia mạng máy tính thành 7 tầng"
+  },
+  {
+    "id": 4,
+    "query": "Vai trò của Tầng Ứng dụng Application Layer là gì?",
+    "target_page": 9,
+    "keyword_anchor": "cầu nối giữa người dùng và mạng máy tính"
+  },
+  {
+    "id": 5,
+    "query": "Chức năng của Tầng Trình bày Presentation Layer",
+    "target_page": 10,
+    "keyword_anchor": "chuyển đổi định dạng dữ liệu"
+  },
+  {
+    "id": 6,
+    "query": "Các dịch vụ của Tầng Trình bày là gì?",
+    "target_page": 11,
+    "keyword_anchor": "Chuyển đổi mã hóa: Chuyển đổi mã hóa ASCII sang Unicode"
+  },
+  {
+    "id": 7,
+    "query": "Vai trò quan trọng của Tầng Phiên Session Layer",
+    "target_page": 12,
+    "keyword_anchor": "Quản lý phiên giao tiếp: Tầng Phiên đảm bảo rằng các phiên giao tiếp được thiết lập"
+  },
+  {
+    "id": 8,
+    "query": "Chức năng chính của Tầng Truyền tải Transport Layer",
+    "target_page": 13,
+    "keyword_anchor": "Kết nối điểm-điểm: Tầng Truyền tải thiết lập kết nối giữa các ứng dụng"
+  },
+  {
+    "id": 9,
+    "query": "Vai trò quan trọng của tầng Network trong mô hình OSI",
+    "target_page": 14,
+    "keyword_anchor": "Định tuyến (Routing): Tầng Network chịu trách nhiệm tìm đường đi tối ưu"
+  },
+  {
+    "id": 10,
+    "query": "Chức năng chính của tầng Data Link",
+    "target_page": 15,
+    "keyword_anchor": "Kiểm soát lỗi: Sử dụng các kỹ thuật như mã hóa chặn kiểm tra lỗi (CRC)"
+  },
+  {
+    "id": 11,
+    "query": "Kỹ thuật Token Passing trong mạng Token Ring hoạt động thế nào?",
+    "target_page": 16,
+    "keyword_anchor": "Một token (dấu hiệu) được truyền xung quanh mạng"
+  },
+  {
+    "id": 12,
+    "query": "Vai trò quan trọng của tầng con LLC",
+    "target_page": 17,
+    "keyword_anchor": "Đảm bảo truyền tải dữ liệu chính xác: LLC giúp phát hiện và sửa lỗi"
+  },
+  {
+    "id": 13,
+    "query": "Nhiệm vụ của Tầng Vật lý Physical Layer",
+    "target_page": 18,
+    "keyword_anchor": "Truyền tín hiệu: Tầng vật lý chịu trách nhiệm truyền tín hiệu"
+  },
+  {
+    "id": 14,
+    "query": "Mô hình mạng SNA là gì và do ai phát triển?",
+    "target_page": 20,
+    "keyword_anchor": "Mô hình SNA là mô hình mạng được phát triển bởi IBM"
+  },
+  {
+    "id": 15,
+    "query": "Giao thức SMTP dùng để làm gì?",
+    "target_page": 7,
+    "keyword_anchor": "Giao thức để gửi email, xác định cách thức truyền thư giữa các máy chủ"
+  }
+]

@@ -1,0 +1,110 @@
+[
+  {
+    "id": 1,
+    "type": "independent",
+    "query": "Chức năng của Triết học Mác - Lênin là gì?",
+    "expected_concepts": ["thế giới quan", "phương pháp luận"],
+    "note": "Kiểm tra khả năng tìm trúng 2 chức năng lớn ở phần mở đầu"
+  },
+  {
+    "id": 2,
+    "type": "independent",
+    "query": "Chức năng thế giới quan của triết học Mác - Lênin có vai trò gì?",
+    "expected_concepts": ["lăng kính duy vật biện chứng", "định hướng lý tưởng", "vũ khí lý luận"],
+    "note": "Kiểm tra chi tiết chức năng thế giới quan"
+  },
+  {
+    "id": 3,
+    "type": "independent",
+    "query": "Chức năng phương pháp luận của triết học Mác - Lênin có ý nghĩa gì?",
+    "expected_concepts": ["hệ thống các nguyên tắc", "định hướng nhận thức và hành động", "không phải là đơn thuốc vạn năng"],
+    "note": "Kiểm tra chi tiết chức năng phương pháp luận"
+  },
+  {
+    "id": 4,
+    "type": "independent",
+    "query": "Khái niệm vật chất theo định nghĩa của Lênin là gì?",
+    "expected_concepts": ["phạm trù triết học", "thực tại khách quan", "chép lại, chụp lại"],
+    "note": "Kiểm tra định nghĩa cốt lõi kinh điển"
+  },
+  {
+    "id": 5,
+    "type": "independent",
+    "query": "Mối quan hệ giữa vật chất và ý thức trong chủ nghĩa duy vật biện chứng?",
+    "expected_concepts": ["vật chất quyết định ý thức", "ý thức tác động trở lại"],
+    "note": "Kiểm tra câu hỏi quan hệ biện chứng"
+  },
+  {
+    "id": 6,
+    "type": "independent",
+    "query": "Quy luật chuyển hóa từ những sự thay đổi về lượng thành những thay đổi về chất phát biểu thế nào?",
+    "expected_concepts": ["lượng đổi dẫn đến chất đổi", "độ", "điểm nút", "bước nhảy"],
+    "note": "Kiểm tra quy luật lượng - chất"
+  },
+  {
+    "id": 7,
+    "type": "independent",
+    "query": "Quy luật thống nhất và đấu tranh giữa các mặt đối lập có vai trò gì?",
+    "expected_concepts": ["hạt nhân của phép biện chứng", "nguồn gốc và động lực của sự phát triển"],
+    "note": "Kiểm tra quy luật mâu thuẫn"
+  },
+  {
+    "id": 8,
+    "type": "independent",
+    "query": "Thực tiễn là gì và có những hình thức cơ bản nào?",
+    "expected_concepts": ["hoạt động vật chất có mục đích", "sản xuất vật chất", "chính trị xã hội", "thực nghiệm khoa học"],
+    "note": "Kiểm tra khái niệm và phân loại thực tiễn"
+  },
+  {
+    "id": 9,
+    "type": "independent",
+    "query": "Vai trò của thực tiễn đối với nhận thức là gì?",
+    "expected_concepts": ["cơ sở, động lực của nhận thức", "mục đích của nhận thức", "tiêu chuẩn của chân lý"],
+    "note": "Kiểm tra 3 vai trò của thực tiễn"
+  },
+  {
+    "id": 10,
+    "type": "independent",
+    "query": "Quy luật quan hệ sản xuất phù hợp với trình độ phát triển của lực lượng sản xuất có nội dung gì?",
+    "expected_concepts": ["lực lượng sản xuất quyết định quan hệ sản xuất", "quan hệ sản xuất tác động trở lại"],
+    "note": "Kiểm tra quy luật nền tảng của duy vật lịch sử"
+  },
+  {
+    "id": 11,
+    "type": "follow_up",
+    "base_id": 1,
+    "query": "Nó gồm những nội dung chi tiết nào?",
+    "expected_concepts": ["thế giới quan", "phương pháp luận"],
+    "note": "Câu follow-up kiểm tra anaphora 'nó'"
+  },
+  {
+    "id": 12,
+    "type": "follow_up",
+    "base_id": 8,
+    "query": "Hình thức nào trong số đó đóng vai trò quan trọng nhất?",
+    "expected_concepts": ["sản xuất vật chất"],
+    "note": "Câu follow-up kiểm tra ngữ cảnh liên kết"
+  },
+  {
+    "id": 13,
+    "type": "follow_up",
+    "base_id": 6,
+    "query": "Cho ví dụ cụ thể về điều đó?",
+    "expected_concepts": ["nhiệt độ", "nước sôi", "chuyển thể"],
+    "note": "Câu follow-up kiểm tra ví dụ minh họa"
+  },
+  {
+    "id": 14,
+    "type": "independent",
+    "query": "Tồn tại xã hội và ý thức xã hội cái nào có trước?",
+    "expected_concepts": ["tồn tại xã hội quyết định ý thức xã hội", "ý thức xã hội phản ánh"],
+    "note": "Kiểm tra duy vật lịch sử"
+  },
+  {
+    "id": 15,
+    "type": "independent",
+    "query": "Giai cấp là gì theo định nghĩa của Lênin?",
+    "expected_concepts": ["những tập đoàn người to lớn", "địa vị trong một hệ thống sản xuất"],
+    "note": "Kiểm tra định nghĩa giai cấp"
+  }
+]
