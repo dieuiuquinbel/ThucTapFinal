@@ -279,9 +279,11 @@ def load_document(file_path: str) -> List[Dict[str, Any]]:
     ext = os.path.splitext(file_path)[1].lower()
     if ext == ".pdf":
         return extract_text_from_pdf(file_path)
-    elif ext in [".docx", ".doc"]:
+    elif ext == ".docx":
         return extract_text_from_docx(file_path)
+    elif ext == ".doc":
+        raise ValueError("Định dạng .doc cũ (Word 97-2003) không được hỗ trợ trực tiếp. Vui lòng mở tệp bằng Word và Lưu dưới dạng (Save As) sang .docx hoặc .pdf trước khi tải lên.")
     elif ext in [".txt", ".md"]:
         return extract_text_from_txt(file_path)
     else:
-        raise ValueError(f"Định dạng tệp {ext} chưa được hỗ trợ. Vui lòng tải lên PDF, DOCX hoặc TXT.")
+        raise ValueError(f"Định dạng tệp {ext} chưa được hỗ trợ. Chỉ hỗ trợ .pdf, .docx, .txt.")

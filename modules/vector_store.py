@@ -1,10 +1,19 @@
 import os
 import re
 import unicodedata
+import logging
 from typing import List, Dict, Any, Optional
 import chromadb
 from chromadb.config import Settings
 from modules.embedding_service import EmbeddingService
+from rank_bm25 import BM25Okapi
+try:
+    from flashrank import Ranker, RerankRequest
+    HAS_FLASHRANK = True
+except ImportError:
+    HAS_FLASHRANK = False
+
+logger = logging.getLogger(__name__)
 
 
 class VectorStore:
@@ -25,6 +34,15 @@ class VectorStore:
             embedding_function=self.embedding_service,
             metadata={"hnsw:space": "cosine"}
         )
+
+        # Khởi tạo Reranker siêu nhẹ (FlashRank ms-marco-TinyBERT ~3MB, chạy ONNX ~2ms)
+        self.ranker = None
+        if HAS_FLASHRANK:
+            try:
+                self.ranker = Ranker(model_name="ms-marco-TinyBERT-L-2-v2")
+                logger.info("[VectorStore] Đã tải thành công FlashRank Cross-Encoder Reranker.")
+            except Exception as e:
+                logger.warning(f"[VectorStore] Không thể tải FlashRank: {e}")
 
     def add_documents(self, chunks: List[Dict[str, Any]]) -> int:
         """
@@ -68,23 +86,28 @@ class VectorStore:
         query: str, 
         top_k: int = 4, 
         filter_source: Optional[str] = None,
-        min_score: float = 0.50
+        min_score: float = 0.40
     ) -> List[Dict[str, Any]]:
         """
-        Tìm kiếm ngữ nghĩa kết hợp Lexical Reranking nhẹ:
-        1. Mở rộng ứng viên ban đầu (candidates = max(top_k * 2, 6)).
-        2. Tính điểm kết hợp: 0.75 * Cosine_Similarity + 0.25 * Lexical_Score.
-        3. Ưu tiên đoạn khớp từ khóa cụ thể hoặc cấu trúc định nghĩa.
+        Quy trình Hybrid Search 2 giai đoạn tiên tiến (Dense BGE-M3 + BM25 + FlashRank Reranker):
+        1. Giai đoạn 1 (Candidate Retrieval):
+           - Lấy candidate pool (tối đa 25 đoạn) từ ChromaDB bằng Dense Vector (BGE-M3).
+           - Chấm điểm BM25Okapi trên tập ứng viên.
+           - Dung hợp xếp hạng qua Reciprocal Rank Fusion (RRF).
+        2. Giai đoạn 2 (Cross-Encoder Reranking):
+           - Đưa top 10-12 đoạn từ RRF qua mô hình FlashRank (ms-marco-TinyBERT ONNX).
+           - Tinh lọc lấy top_k đoạn sát sườn nhất (mặc định 4 đoạn) để đưa vào LLM.
         """
         where_clause = None
         if filter_source and filter_source != "Tất cả tài liệu":
             norm_source = unicodedata.normalize('NFC', filter_source)
             where_clause = {"source": norm_source}
             
-        # Lấy candidate pool an toàn (tối đa bằng số chunk hiện có trong DB)
         total_in_db = self.collection.count()
         if total_in_db == 0:
             return []
+            
+        # Thu thập ứng viên (Candidate Retrieval: 20-25 đoạn)
         candidate_k = min(total_in_db, max(top_k * 5, 20))
 
         query_results = self.collection.query(
@@ -94,67 +117,96 @@ class VectorStore:
             include=["documents", "metadatas", "distances"]
         )
         
-        if not query_results or not query_results["documents"]:
+        if not query_results or not query_results["documents"] or not query_results["documents"][0]:
             return []
             
         docs = query_results["documents"][0]
         metas = query_results["metadatas"][0]
         distances = query_results["distances"][0]
 
-        query_terms = [w.lower() for w in re.findall(r'\w+', query) if len(w) > 2]
-        query_lower = query.lower()
-        is_definition_query = any(k in query_lower for k in ["khái niệm", "là gì", "định nghĩa"])
-        is_listing_query = any(k in query_lower for k in ["bao gồm", "những tầng nào", "các tầng", "gồm những", "danh sách", "liệt kê"])
-
-        scored_candidates = []
-        for doc, meta, dist in zip(docs, metas, distances):
+        # 1. Tính Dense Semantic Score (Cosine)
+        dense_candidates = []
+        for idx, (doc, meta, dist) in enumerate(zip(docs, metas, distances)):
             semantic_score = max(0.0, 1.0 - dist)
-            if semantic_score < min_score:
-                continue
-
-            doc_lower = doc.lower()
-            # 1. Lexical token overlap ratio
-            matched_terms = sum(1 for term in query_terms if term in doc_lower)
-            lexical_ratio = (matched_terms / len(query_terms)) if query_terms else 0.0
-
-            # 2. Điểm cộng/trừ theo mục tiêu truy vấn và độ khớp tiêu đề
-            match_bonus = 0.0
-            
-            # Ưu tiên các chunk chứa tiêu đề hoặc cụm từ khóa chính của câu hỏi (ví dụ: "chức năng thế giới quan", "chức năng của")
-            exact_phrase_matches = sum(1 for term in query_terms if f" {term} " in f" {doc_lower} ")
-            if len(query_terms) > 0 and (exact_phrase_matches / len(query_terms)) > 0.6:
-                match_bonus += 0.15
-
-            # Nếu hỏi chức năng / vai trò / đặc điểm, ưu tiên chunk có tiêu đề gạch đầu dòng tương ứng
-            if any(k in query_lower for k in ["chức năng", "vai trò", "ý nghĩa", "đặc điểm"]):
-                if any(k in doc_lower for k in ["chức năng", "vai trò", "ý nghĩa"]):
-                    match_bonus += 0.12
-
-            if is_definition_query:
-                has_definition_phrase = any(p in doc_lower for p in ["là phương pháp", "là mô hình", "là một", "được định nghĩa", "khái niệm"])
-                if has_definition_phrase:
-                    match_bonus += 0.10
-
-            if is_listing_query:
-                has_enumeration = bool(re.search(r'(?m)^\s*(?:\d+[\.\)]|[\•\-\*])\s+[A-ZÀ-Ỹa-zà-ỹ]', doc))
-                if has_enumeration:
-                    match_bonus += 0.15
-
-            # Điểm dung hợp (Hybrid Fusion Score)
-            final_score = round((0.60 * semantic_score) + (0.40 * lexical_ratio) + match_bonus, 4)
-
-            scored_candidates.append({
+            dense_candidates.append({
+                "idx": idx,
                 "text": doc,
                 "metadata": meta,
-                "score": final_score,
-                "semantic_score": round(semantic_score, 4),
+                "semantic_score": semantic_score,
+                "dense_rank": idx + 1
+            })
+
+        # 2. Tính BM25 Sparse Score
+        def tokenize(text: str) -> List[str]:
+            return [w.lower() for w in re.findall(r'\w+', text) if len(w) > 1]
+
+        tokenized_query = tokenize(query)
+        tokenized_corpus = [tokenize(doc) for doc in docs]
+        
+        bm25_scores = [0.0] * len(docs)
+        if tokenized_query and any(len(c) > 0 for c in tokenized_corpus):
+            try:
+                bm25 = BM25Okapi(tokenized_corpus)
+                bm25_scores = bm25.get_scores(tokenized_query).tolist()
+            except Exception as e:
+                logger.warning(f"[VectorStore] BM25 scoring error: {e}")
+
+        # Sắp xếp theo BM25 để lấy bm25_rank
+        bm25_ranked_indices = sorted(range(len(bm25_scores)), key=lambda i: bm25_scores[i], reverse=True)
+        bm25_rank_map = {idx: rank + 1 for rank, idx in enumerate(bm25_ranked_indices)}
+
+        # 3. Dung hợp xếp hạng qua Reciprocal Rank Fusion (RRF)
+        # RRF Score = 1 / (60 + dense_rank) + 1 / (60 + bm25_rank)
+        for item in dense_candidates:
+            idx = item["idx"]
+            b_score = bm25_scores[idx]
+            b_rank = bm25_rank_map[idx]
+            item["bm25_score"] = round(b_score, 4)
+            item["rrf_score"] = (1.0 / (60.0 + item["dense_rank"])) + (1.0 / (60.0 + b_rank))
+
+        # Sắp xếp ứng viên theo RRF
+        dense_candidates.sort(key=lambda x: x["rrf_score"], reverse=True)
+        rrf_top = dense_candidates[:min(len(dense_candidates), max(top_k * 3, 10))]
+
+        # 4. Cross-Encoder Reranking bằng FlashRank (nếu có sẵn)
+        reranked_results = []
+        if self.ranker and len(rrf_top) > 1:
+            try:
+                passages = [{"id": i, "text": item["text"]} for i, item in enumerate(rrf_top)]
+                rerank_req = RerankRequest(query=query, passages=passages)
+                flash_res = self.ranker.rerank(rerank_req)
+                
+                # Ánh xạ lại điểm rerank
+                score_map = {r["id"]: r["score"] for r in flash_res}
+                for i, item in enumerate(rrf_top):
+                    r_score = score_map.get(i, 0.0)
+                    item["rerank_score"] = round(float(r_score), 4)
+                    item["final_score"] = round(0.5 * item["semantic_score"] + 0.5 * float(r_score), 4)
+                    reranked_results.append(item)
+
+                reranked_results.sort(key=lambda x: x["final_score"], reverse=True)
+            except Exception as e:
+                logger.warning(f"[VectorStore] FlashRank reranking error, falling back to RRF: {e}")
+                reranked_results = rrf_top
+        else:
+            reranked_results = rrf_top
+
+        # 5. Định dạng đầu ra sạch sẽ kèm metadata
+        final_chunks = []
+        for item in reranked_results[:top_k]:
+            meta = item.get("metadata", {})
+            final_chunks.append({
+                "text": item["text"],
+                "metadata": meta,
+                "score": item.get("final_score", round(item.get("semantic_score", 0.0), 4)),
+                "semantic_score": round(item.get("semantic_score", 0.0), 4),
+                "bm25_score": item.get("bm25_score", 0.0),
+                "rerank_score": item.get("rerank_score", 0.0),
                 "page": meta.get("page", 1),
                 "source": meta.get("source", "Không rõ")
             })
 
-        # Sắp xếp lại theo điểm dung hợp cuối cùng
-        scored_candidates.sort(key=lambda x: x["score"], reverse=True)
-        return scored_candidates[:top_k]
+        return final_chunks
 
     def list_documents(self) -> List[Dict[str, Any]]:
         """

@@ -7,7 +7,7 @@ from typing import Optional, List
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from modules.document_loader import load_document
 from modules.text_processor import chunk_document_pages
@@ -17,6 +17,7 @@ from modules.llm_service import LLMService
 from modules.rag_pipeline import RAGPipeline
 from modules.quiz_generator import QuizGenerator
 from modules.summarizer import DocumentSummarizer
+from modules.auth_service import AuthService, decode_jwt_token
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 logger = logging.getLogger(__name__)
@@ -56,24 +57,51 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     query: str
     filter_source: Optional[str] = "Tất cả tài liệu"
-    top_k: Optional[int] = 4
+    top_k: Optional[int] = Field(default=4, ge=1, le=10)
     history: Optional[List[ChatMessage]] = None
 
 
 class QuizRequest(BaseModel):
     document_source: str
-    num_questions: Optional[int] = 5
+    num_questions: Optional[int] = Field(default=5, ge=1, le=25)
     difficulty: Optional[str] = "Trung bình"
+    shuffle: Optional[bool] = False
 
 
 class FlashcardRequest(BaseModel):
     document_source: str
-    num_cards: Optional[int] = 6
+    num_cards: Optional[int] = Field(default=6, ge=1, le=15)
 
 
 class SummarizeRequest(BaseModel):
     document_source: str
-    style: Optional[str] = "Chuẩn học thuật"
+    style: Optional[str] = "Trung bình"
+
+
+class RegisterRequest(BaseModel):
+    email: str
+    full_name: str
+    password: str
+    avatar: Optional[str] = "🐱"
+
+class VerifyOtpRequest(BaseModel):
+    email: str
+    otp: str
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+class ResendOtpRequest(BaseModel):
+    email: str
+    type: Optional[str] = "verify-email"
+
+class SaveQuizScoreRequest(BaseModel):
+    document_source: str
+    score_10: float
+    correct_count: int
+    total_questions: int
+    difficulty: str
 
 
 @app.get("/api/status")
@@ -136,29 +164,29 @@ def list_documents():
 
 
 
+ALLOWED_EXTENSIONS = {".pdf", ".docx", ".txt", ".md"}
+MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
+
 def precompute_study_assets(filename: str):
     """
     Tiến trình chạy ngầm (Background Task - NotebookLM Style):
-    Tự động tóm tắt trước cả 3 mức (Cơ bản, Trung bình, Nâng cao) VÀ
-    tự động sinh bộ đề thi trắc nghiệm (Trung bình, Dễ, Khó) vào Cache.
+    Tự động chuẩn bị trước Quiz và Tóm tắt vào Cache để người dùng truy cập tức thì.
     """
     try:
-        chunks = vector_store.get_document_chunks_sampled(source_filename=filename, max_chunks=8)
+        chunks = vector_store.get_document_chunks_sampled(source_filename=filename, max_chunks=6)
         if not chunks:
             return
         combined_text = "\n\n".join([f"(Trang {c.get('page', 1)}): {c['text']}" for c in chunks])
         
-        # Tiến trình ngầm chỉ tạo sẵn 2 tài sản mặc định phổ biến nhất để GPU hoàn tất nhanh (~40s),
-        # tránh gây tắc nghẽn hàng đợi khi người dùng bấm sinh đề hoặc tóm tắt.
+        # 1. ƯU TIÊN SỐ 1: Sinh sẵn Đề thi trắc nghiệm Quiz trọn bộ 15 câu 'Trung bình'
+        # Khi hoàn thành, người dùng chọn 5, 10 hay 15 câu đều được trả về tức thì từ cache
+        quiz_context = combined_text[:5000]
+        logger.info(f"[Background] Đang tạo cache Quiz 'Trung bình' (15 câu) cho {filename}...")
+        quiz_gen.generate_quiz(context_text=quiz_context, num_questions=15, difficulty="Trung bình", doc_name=filename)
         
-        # 1. Tóm tắt 'Trung bình' (mặc định khi vào tab Tóm tắt)
+        # 2. ƯU TIÊN SỐ 2: Tóm tắt 'Trung bình'
         logger.info(f"[Background] Đang tạo cache Tóm tắt 'Trung bình' cho {filename}...")
-        summarizer.summarize(text_content=combined_text, document_title=filename, summary_style="Trung bình")
-        
-        # 2. Sinh sẵn Đề thi trắc nghiệm Quiz 5 câu 'Trung bình' (mặc định khi vào tab Đề thi)
-        quiz_context = combined_text[:8000]
-        logger.info(f"[Background] Đang tạo cache Quiz 'Trung bình' (5 câu) cho {filename}...")
-        quiz_gen.generate_quiz(context_text=quiz_context, num_questions=5, difficulty="Trung bình", doc_name=filename)
+        summarizer.summarize(text_content=combined_text[:5000], document_title=filename, summary_style="Trung bình")
         
         logger.info(f"[Background] HOÀN TẤT nạp cache khởi động nhanh cho {filename}!")
     except Exception as e:
@@ -168,15 +196,39 @@ def precompute_study_assets(filename: str):
 @app.post("/api/upload")
 async def upload_documents(background_tasks: BackgroundTasks, files: List[UploadFile] = File(...)):
     """
-    Tải lên và xử lý phân tích file PDF, DOCX, TXT vào ChromaDB.
+    Tải lên và xử lý phân tích file PDF, DOCX, TXT vào ChromaDB có kiểm soát định dạng & kích thước.
     """
     results = []
     total_chunks = 0
     
     for file in files:
-        suffix = os.path.splitext(file.filename)[1]
+        suffix = os.path.splitext(file.filename)[1].lower()
+        if suffix == ".doc":
+            results.append({
+                "filename": file.filename,
+                "error": "Định dạng .doc cũ (Word 97-2003) không được hỗ trợ. Vui lòng mở tệp bằng Word và Lưu dưới dạng (Save As) sang .docx hoặc .pdf trước khi tải lên.",
+                "status": "error"
+            })
+            continue
+
+        if suffix not in ALLOWED_EXTENSIONS:
+            results.append({
+                "filename": file.filename,
+                "error": f"Định dạng tệp '{suffix}' không được hỗ trợ. Chỉ chấp nhận .pdf, .docx, .txt.",
+                "status": "error"
+            })
+            continue
+
+        content = await file.read()
+        if len(content) > MAX_FILE_SIZE:
+            results.append({
+                "filename": file.filename,
+                "error": f"Kích thước tệp ({len(content)/(1024*1024):.1f}MB) vượt quá giới hạn tối đa 50MB.",
+                "status": "error"
+            })
+            continue
+
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-            content = await file.read()
             tmp.write(content)
             tmp_path = tmp.name
 
@@ -204,7 +256,7 @@ async def upload_documents(background_tasks: BackgroundTasks, files: List[Upload
             
             total_chunks += added
             
-            # Kích hoạt chạy ngầm tạo trước bản tóm tắt và bộ quiz vào Cache
+            # Kích hoạt chạy ngầm tạo trước Quiz và Tóm tắt vào Cache
             background_tasks.add_task(precompute_study_assets, file.filename)
 
             results.append({
@@ -222,6 +274,11 @@ async def upload_documents(background_tasks: BackgroundTasks, files: List[Upload
         finally:
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
+
+    successful_count = sum(1 for r in results if r["status"] == "success")
+    if successful_count == 0 and len(files) > 0:
+        first_err = results[0].get("error", "Xử lý tệp thất bại")
+        raise HTTPException(status_code=400, detail=first_err)
 
     return {
         "message": f"Đã xử lý xong {len(files)} tệp tin",
@@ -306,9 +363,10 @@ def generate_quiz(req: QuizRequest):
     combined_text = "\n\n".join([f"(Trang {c.get('page', 1)}): {c['text']}" for c in chunks])[:10000]
     res = quiz_gen.generate_quiz(
         context_text=combined_text,
-        num_questions=min(req.num_questions or 10, 15),
+        num_questions=min(max(req.num_questions or 5, 1), 25),
         difficulty=req.difficulty or "Trung bình",
-        doc_name=req.document_source
+        doc_name=req.document_source,
+        shuffle=bool(req.shuffle)
     )
     return res
 
@@ -330,7 +388,7 @@ def generate_flashcards(req: FlashcardRequest):
     combined_text = "\n\n".join([f"(Trang {c.get('page', 1)}): {c['text']}" for c in chunks])[:10000]
     res = quiz_gen.generate_flashcards(
         context_text=combined_text,
-        num_cards=min(req.num_cards or 6, 6)
+        num_cards=min(max(req.num_cards or 6, 2), 12)
     )
     return res
 
@@ -355,6 +413,99 @@ def summarize_document(req: SummarizeRequest):
         summary_style=req.style or "Chuẩn học thuật"
     )
     return res
+
+
+# ==========================================
+# CÁC API XÁC THỰC VÀ LỊCH SỬ ĐIỂM HỌC VIÊN
+# ==========================================
+
+from fastapi import Header, Depends
+
+def get_current_user(authorization: Optional[str] = Header(default=None)) -> Optional[dict]:
+    logger.info(f"[Auth] get_current_user Header: {authorization}")
+    if not authorization:
+        return None
+    token = authorization.replace("Bearer ", "").strip()
+    user = decode_jwt_token(token)
+    logger.info(f"[Auth] Decoded user: {user}")
+    return user
+
+@app.post("/api/auth/register")
+def register_user(req: RegisterRequest):
+    try:
+        res = AuthService.register(
+            email=req.email,
+            full_name=req.full_name,
+            password=req.password,
+            avatar=req.avatar or "🐱"
+        )
+        return {"success": True, "data": res}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Lỗi đăng ký: {e}")
+        raise HTTPException(status_code=500, detail="Không thể tạo tài khoản. Vui lòng thử lại!")
+
+@app.post("/api/auth/verify-otp")
+def verify_otp(req: VerifyOtpRequest):
+    try:
+        res = AuthService.verify_email_otp(email=req.email, otp_code=req.otp)
+        return {"success": True, "data": res}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Lỗi xác minh OTP: {e}")
+        raise HTTPException(status_code=500, detail="Lỗi máy chủ khi xác thực OTP.")
+
+@app.post("/api/auth/login")
+def login_user(req: LoginRequest):
+    try:
+        res = AuthService.login(email=req.email, password=req.password)
+        return {"success": True, "data": res}
+    except ValueError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+    except Exception as e:
+        logger.error(f"Lỗi đăng nhập: {e}")
+        raise HTTPException(status_code=500, detail="Không thể đăng nhập. Vui lòng thử lại!")
+
+@app.post("/api/auth/resend-otp")
+def resend_otp(req: ResendOtpRequest):
+    try:
+        res = AuthService.resend_otp(email=req.email, otp_type=req.type or "verify-email")
+        return {"success": True, "data": res}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/auth/me")
+def get_me(user: Optional[dict] = Depends(get_current_user)):
+    if not user:
+        raise HTTPException(status_code=401, detail="Chưa đăng nhập hoặc token hết hạn")
+    return {"success": True, "data": user}
+
+@app.post("/api/user/quiz-score")
+def save_quiz_score(req: SaveQuizScoreRequest, user: Optional[dict] = Depends(get_current_user)):
+    if not user:
+        return {"success": False, "message": "Guest quiz, not saved"}
+    
+    AuthService.save_quiz_score(
+        user_id=int(user["sub"]),
+        document_source=req.document_source,
+        score_10=req.score_10,
+        correct_count=req.correct_count,
+        total_questions=req.total_questions,
+        difficulty=req.difficulty
+    )
+    return {"success": True, "message": "Đã lưu điểm bài thi thành công"}
+
+@app.get("/api/user/quiz-history")
+def get_user_quiz_history(user: Optional[dict] = Depends(get_current_user)):
+    if not user:
+        return {"success": True, "data": []}
+    
+    history = AuthService.get_user_quiz_history(user_id=int(user["sub"]))
+    return {"success": True, "data": history}
 
 
 if __name__ == "__main__":

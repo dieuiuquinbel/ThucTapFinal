@@ -118,24 +118,18 @@ def is_conversational_query(query: str) -> Optional[str]:
         if re.search(pattern, q):
             if "cảm ơn" in q or "thank" in q:
                 return "Rất vui được hỗ trợ bạn! Nếu có câu hỏi nào về nội dung tài liệu học tập, bạn cứ hỏi tôi nhé."
-            return (
-                "Xin chào! Tôi là Trợ lý Học tập Thông minh (SmartStudy RAG).\n"
-                "Tôi có thể hỗ trợ bạn:\n"
-                "• Trả lời câu hỏi bám sát giáo trình/slide môn học kèm trích dẫn số trang.\n"
-                "• Luyện thi trắc nghiệm (Quiz A-B-C-D) có chấm điểm tự động.\n"
-                "• Tạo thẻ ghi nhớ Flashcards và tóm tắt bài giảng.\n\n"
-                "Bạn có thể nhập câu hỏi về tài liệu đã tải lên để bắt đầu!"
-            )
+            return "Xin chào! Bạn có thể đặt câu hỏi về nội dung tài liệu đã tải lên, hoặc sử dụng các tính năng Luyện thi trắc nghiệm và Tóm tắt ở các tab phía trên để ôn tập nhé."
     return None
 
 
-RAG_SYSTEM_PROMPT = """Bạn là Trợ lý Học tập Thông minh. Nhiệm vụ của bạn là đọc kỹ các đoạn [NGUỒN 1], [NGUỒN 2]... được cung cấp để trả lời câu hỏi của người dùng một cách chính xác, đầy đủ và chi tiết.
-NGUYÊN TẮC:
-1. ĐỌC KỸ VÀ TẬN DỤNG TẤT CẢ NGUỒN ĐƯỢC CUNG CẤP: Nếu tài liệu có thông tin, bạn BẮT BUỘC phải trả lời ĐẦY ĐỦ, CHI TIẾT và TOÀN DIỆN, phân tích rõ từng ý, từng mục lớn nhỏ.
-2. CÁCH GHI TRÍCH DẪN: Đặt số thứ tự nguồn [1], [2]... ngay sau thông tin tương ứng lấy từ đoạn [NGUỒN 1], [NGUỒN 2]...
-   - Tuyệt đối KHÔNG tự bịa phần liệt kê "[1] Trang X - Tệp: Y" ở cuối câu trả lời (hệ thống frontend đã tự động hiển thị danh sách nguồn kèm số trang chính xác bên dưới).
-3. Trình bày rõ ràng, mạch lạc bằng các tiêu đề hoặc gạch đầu dòng, không cắt bớt các chi tiết quan trọng mà tài liệu đã nêu.
-4. Chỉ khi nội dung hoàn toàn không xuất hiện trong bất kỳ nguồn nào thì mới trả lời: "Không tìm thấy thông tin phù hợp trong tài liệu đã tải lên." """
+RAG_SYSTEM_PROMPT = """Bạn là Trợ lý Học thuật Đại học. Bạn CHỈ ĐƯỢC PHÉP trả lời dựa trên các đoạn ngữ cảnh [NGUỒN 1], [NGUỒN 2]... được cung cấp.
+
+QUY TẮC BẮT BUỘC ĐỂ ĐẢM BẢO TÍNH HỌC THUẬT VÀ TRUNG THỰC:
+1. CHỈ TRẢ LỜI TỪ NGỮ CẢNH ĐƯỢC CUNG CẤP: Tuyệt đối không tự suy diễn hoặc bổ sung kiến thức bên ngoài nếu tài liệu không đề cập.
+2. BẮT BUỘC DẪN NGUỒN: Mỗi luận điểm, định nghĩa hoặc số liệu, bạn BẮT BUỘC phải ghi kèm số hiệu nguồn [1], [2]... ngay sau câu đó (ví dụ: "TCP là giao thức hướng kết nối [1].").
+3. TRƯỜNG HỢP KHÔNG ĐỦ THÔNG TIN: Nếu ngữ cảnh không có thông tin hoặc không đủ tài liệu để trả lời, hãy trả lời chính xác:
+   "Tài liệu hiện tại không có thông tin về vấn đề này. Bạn có thể mở rộng phạm vi tìm kiếm hoặc chọn tài liệu khác."
+4. TRÌNH BÀY MẠCH LẠC: Trình bày súc tích bằng các tiêu đề in đậm và gạch đầu dòng rõ ràng. Tuyệt đối không tự bịa danh sách nguồn ở cuối câu trả lời."""
 
 
 class RAGPipeline:
@@ -155,8 +149,10 @@ class RAGPipeline:
         for idx, chunk in enumerate(retrieved_chunks, 1):
             src = chunk.get("source", "Không rõ nguồn")
             page = chunk.get("page", 1)
+            heading = chunk.get("metadata", {}).get("heading") or chunk.get("heading")
+            heading_str = f" • Mục: {heading}" if heading and heading != "Tổng quan" else ""
             text = chunk.get("text", "").strip()
-            block = f"--- [NGUỒN {idx}] (Trang {page} - Tệp: {src}) ---\n{text}"
+            block = f"--- [NGUỒN {idx}] (Tệp: {src} • Trang {page}{heading_str}) ---\n{text}"
             context_blocks.append(block)
         return "\n\n".join(context_blocks)
 
@@ -177,9 +173,11 @@ class RAGPipeline:
                 idx = int(idx_str) - 1
                 if 0 <= idx < len(retrieved_chunks):
                     chunk = retrieved_chunks[idx]
+                    heading = chunk.get("metadata", {}).get("heading") or chunk.get("heading")
                     used_sources.append({
                         "source": chunk.get("source"),
                         "page": chunk.get("page"),
+                        "heading": heading if heading != "Tổng quan" else None,
                         "score": chunk.get("score"),
                         "snippet": chunk.get("text", "")[:180] + "..."
                     })

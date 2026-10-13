@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import random
 from typing import List, Dict, Any, Optional
 from modules.llm_service import LLMService
 
@@ -80,11 +81,13 @@ class QuizGenerator:
         context_text: str,
         num_questions: int = 5,
         difficulty: str = "Trung bình",
-        doc_name: Optional[str] = None
+        doc_name: Optional[str] = None,
+        shuffle: bool = False
     ) -> Dict[str, Any]:
         """
         Tạo bộ câu hỏi trắc nghiệm có tích hợp Cache siêu tốc (0.05s).
         Key cache theo độ khó (Dễ, Trung bình, Khó) và tự động cắt đúng số lượng câu hỏi yêu cầu.
+        Hỗ trợ shuffle để đảo ngẫu nhiên câu hỏi từ pool khi người dùng làm lại bài thi.
         """
         # Chuẩn hóa độ khó
         diff_label = "Trung bình"
@@ -93,26 +96,36 @@ class QuizGenerator:
         elif "khó" in difficulty.lower():
             diff_label = "Khó"
 
-        # 1. Kiểm tra Cache trước (bất kể số câu hỏi nào cũng tái sử dụng được)
+        # 1. Kiểm tra Cache trước (nếu cache có đủ số câu yêu cầu, trả về ngay 0.05s)
         if doc_name:
             cached = self.get_cached_quiz(doc_name, diff_label)
-            if cached and cached.get("success") and isinstance(cached.get("data"), list) and len(cached["data"]) >= 1:
-                # Cắt đúng số lượng câu hỏi mà người dùng yêu cầu
-                selected_questions = [dict(item) for item in cached["data"][:num_questions]]
-                for idx, q in enumerate(selected_questions, 1):
-                    q["id"] = idx
-                logger.info(f"[Quiz Cache Hit] Trả về {len(selected_questions)} câu từ cache ({diff_label}) cho {doc_name}")
-                return {
-                    "data": selected_questions,
-                    "success": True,
-                    "from_cache": True,
-                    "latency_sec": 0.05,
-                    "model_used": cached.get("model_used", self.llm_service.active_model)
-                }
+            if cached and cached.get("success") and isinstance(cached.get("data"), list):
+                cached_questions = cached["data"]
+                # Nếu cache có đủ số câu yêu cầu (hoặc ít nhất 10 câu khi yêu cầu 10/15)
+                if len(cached_questions) >= num_questions:
+                    if shuffle:
+                        # Đảo ngẫu nhiên không trùng từ pool câu hỏi trong cache
+                        selected_pool = random.sample(cached_questions, min(num_questions, len(cached_questions)))
+                    else:
+                        selected_pool = cached_questions[:num_questions]
+                    selected_questions = [dict(item) for item in selected_pool]
+                    for idx, q in enumerate(selected_questions, 1):
+                        q["id"] = idx
+                    logger.info(f"[Quiz Cache Hit] Trả về {len(selected_questions)}/{len(cached_questions)} câu (shuffle={shuffle}) từ cache ({diff_label}) cho {doc_name}")
+                    return {
+                        "data": selected_questions,
+                        "success": True,
+                        "from_cache": True,
+                        "latency_sec": 0.05,
+                        "model_used": cached.get("model_used", self.llm_service.active_model),
+                        "document_title": doc_name,
+                        "difficulty": diff_label,
+                        "shuffled": shuffle
+                    }
 
-        # 2. Nếu chưa có Cache, sinh mới qua LLM với ngữ cảnh súc tích
-        safe_context = context_text[:8000]
-        actual_generate_count = max(num_questions, 5)
+        # 2. Nếu chưa có Cache hoặc cache chưa đủ số câu: Sinh trọn vẹn pool 20 câu để nạp đầy đủ
+        safe_context = context_text[:5500]
+        actual_generate_count = max(min(num_questions, 20), 20)  # Sinh pool 20 câu để dùng chung và đảo ngẫu nhiên khi thi lại
 
         diff_instructions = {
             "Dễ": "Mức độ Dễ: Tập trung vào các định nghĩa, thuật ngữ và khái niệm cơ bản được nêu trực tiếp trong bài.",
@@ -150,7 +163,7 @@ Bắt buộc trả về đúng định dạng JSON có khóa "questions":
     }}
   ]
 }}"""
-        calc_tokens = max(1400, actual_generate_count * 220)
+        calc_tokens = max(2000, actual_generate_count * 220)
         res = self.llm_service.generate_json(
             prompt=prompt, 
             system_prompt=QUIZ_SYSTEM_PROMPT, 
@@ -158,13 +171,19 @@ Bắt buộc trả về đúng định dạng JSON có khóa "questions":
             num_ctx=4096
         )
 
+        res["document_title"] = doc_name
+        res["difficulty"] = diff_label
+
         if res.get("success") and doc_name:
             if isinstance(res.get("data"), list) and len(res["data"]) >= 1:
-                self.save_cached_quiz(doc_name, diff_label, res)
+                # Lưu toàn bộ danh sách câu hỏi đã sinh (15 câu) vào cache
+                self.save_cached_quiz(doc_name, diff_label, dict(res))
             res["from_cache"] = False
 
         if res.get("success") and isinstance(res.get("data"), list) and len(res["data"]) > num_questions:
             res["data"] = res["data"][:num_questions]
+            for idx, q in enumerate(res["data"], 1):
+                q["id"] = idx
 
         return res
 

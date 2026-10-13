@@ -198,8 +198,22 @@ class LLMService:
         if json_match:
             raw_text = json_match.group(1).strip()
             
+        parsed = None
         try:
             parsed = json.loads(raw_text)
+        except json.JSONDecodeError:
+            # Cố gắng khôi phục JSON bị cắt đuôi token (ví dụ thiếu ']}' hoặc ']')
+            last_brace = raw_text.rfind('}')
+            if last_brace != -1:
+                for suffix in ["\n]}", "\n]", "\n}"]:
+                    try:
+                        fixed_text = raw_text[:last_brace + 1] + suffix
+                        parsed = json.loads(fixed_text)
+                        break
+                    except Exception:
+                        continue
+
+        if parsed is not None:
             if isinstance(parsed, dict):
                 for k in ["questions", "quiz", "data", "cards", "flashcards"]:
                     if k in parsed and isinstance(parsed[k], list):
@@ -214,11 +228,11 @@ class LLMService:
                 "model_used": res["model_used"],
                 "latency_sec": res["latency_sec"]
             }
-        except json.JSONDecodeError as err:
+        else:
             return {
                 "data": None,
                 "raw": raw_text,
-                "error": f"Lỗi phân tích JSON: {err}",
+                "error": "Lỗi phân tích JSON từ mô hình",
                 "success": False,
                 "model_used": res["model_used"]
             }

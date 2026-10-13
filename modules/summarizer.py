@@ -117,6 +117,8 @@ class DocumentSummarizer:
         if cached:
             cached["from_cache"] = True
             cached["latency_sec"] = 0.05
+            cached["document_title"] = document_title
+            cached["summary_style"] = level_key
             return cached
 
         # 2. Nếu chưa có Cache: Tinh gọn prompt phù hợp theo từng cấp độ
@@ -146,6 +148,9 @@ Dựa vào nội dung trên, hãy viết bản tóm tắt học tập hoàn ch�
             max_tokens=max_toks,
             num_ctx=4096
         )
+
+        res["document_title"] = document_title
+        res["summary_style"] = level_key
 
         if res.get("success"):
             # Lưu ngay vào Cache vĩnh viễn
