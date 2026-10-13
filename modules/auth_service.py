@@ -9,11 +9,23 @@ import logging
 import secrets
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
+from dotenv import load_dotenv
+
+# Tự động nạp biến môi trường từ file .env nếu có
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "smartstudy.db")
-JWT_SECRET = os.getenv("JWT_SECRET", "smartstudy_super_secret_jwt_key_2026_edtech_offline")
+
+# Bắt buộc đọc JWT_SECRET từ biến môi trường để chống giả mạo token
+JWT_SECRET = os.getenv("JWT_SECRET")
+if not JWT_SECRET or not JWT_SECRET.strip():
+    raise ValueError(
+        "LỖI BẢO MẬT: Biến môi trường 'JWT_SECRET' chưa được thiết lập! "
+        "Vui lòng khai báo 'JWT_SECRET' trong file .env hoặc biến môi trường hệ thống trước khi khởi động ứng dụng."
+    )
+
 JWT_ALGORITHM = "HS256"
 ALLOW_DEV_OTP_HINT = os.getenv("ALLOW_DEV_OTP_HINT", "true").lower() == "true"
 

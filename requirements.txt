@@ -5,6 +5,7 @@
 # 1. Ollama cần được cài đặt riêng từ https://ollama.com và chạy ngầm (port 11434).
 #    Các model yêu cầu:
 #      - ollama pull qwen2.5:7b      (LLM chính)
+#      - ollama pull qwen2.5:3b      (LLM dự phòng / failover nhẹ cho GPU 6GB)
 #      - ollama pull bge-m3          (Embedding model 1024 chiều)
 # 2. PyTorch & EasyOCR:
 #    Hệ thống cấu hình EasyOCR chạy trên CPU (gpu=False) để dành trọn vẹn VRAM
@@ -17,10 +18,19 @@ uvicorn[standard]>=0.30.0
 python-multipart>=0.0.12
 pydantic>=2.9.0
 
+# Authentication & Security
+PyJWT>=2.8.0
+bcrypt>=4.0.0
+
 # Ollama & Vector Database
 ollama>=0.3.0
 chromadb>=0.5.0
 langchain-text-splitters>=0.2.0
+
+# Hybrid Search & Reranking
+rank_bm25>=0.2.2
+flashrank>=0.2.0
+onnxruntime>=1.16.0
 
 # Document Processing & PDF Parsing
 pymupdf>=1.24.0

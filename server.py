@@ -4,6 +4,11 @@ import time
 import logging
 import tempfile
 from typing import Optional, List
+from dotenv import load_dotenv
+
+# Tải cấu hình biến môi trường từ .env
+load_dotenv()
+
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
