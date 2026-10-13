@@ -99,10 +99,12 @@ export default function FlashcardsTab({
                       <RotateCcw className="w-3 h-3" /> Lật thẻ
                     </span>
                   </div>
-                  <p className="font-extrabold text-sky-950 text-base leading-snug mb-2">{card.front}</p>
+                  <p className="font-extrabold text-sky-950 text-base leading-snug mb-2">
+                    {card.front || card.term || card.question || card.concept || card.title || 'Khái niệm quan trọng'}
+                  </p>
                   {isFlipped && (
                     <div className="mt-3 pt-3 border-t border-emerald-200/80 text-xs text-slate-700 leading-relaxed font-medium bg-white/70 p-3 rounded-2xl">
-                      {card.back}
+                      {card.back || card.definition || card.answer || card.explanation || card.meaning || 'Chưa có định nghĩa'}
                     </div>
                   )}
                 </div>

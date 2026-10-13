@@ -16,6 +16,15 @@ YÊU CẦU BẮT BUỘC:
 2. Phải tạo ĐẦY ĐỦ TẤT CẢ các câu hỏi được yêu cầu (từ id: 1 đến id: N), tuyệt đối không dừng lại ở 1 câu!
 3. Mỗi câu hỏi phải có đúng 4 phương án A, B, C, D và đúng 1 đáp án chính xác."""
 
+FLASHCARD_SYSTEM_PROMPT = """Bạn là chuyên gia sư phạm. Nhiệm vụ của bạn là tạo các thẻ ghi nhớ (Flashcard) học tập gồm 2 mặt: Mặt trước (Thuật ngữ/Khái niệm) và Mặt sau (Định nghĩa/Giải thích cốt lõi).
+
+YÊU CẦU BẮT BUỘC:
+1. Trả về đúng mảng JSON các thẻ flashcard: [ { "id": 1, "front": "...", "back": "...", "category": "..." } ].
+2. "front": Tên thuật ngữ, khái niệm hoặc câu hỏi cốt lõi ngắn gọn (dưới 10 từ).
+3. "back": Định nghĩa, bản chất và ý nghĩa cô đọng trong 1-2 câu ngắn (dưới 40 từ).
+4. TUYỆT ĐỐI KHÔNG sinh đề trắc nghiệm có phương án A, B, C, D."""
+
+
 
 class QuizGenerator:
     def __init__(self, llm_service: Optional[LLMService] = None):
@@ -82,7 +91,8 @@ class QuizGenerator:
         num_questions: int = 5,
         difficulty: str = "Trung bình",
         doc_name: Optional[str] = None,
-        shuffle: bool = False
+        shuffle: bool = False,
+        preferred_model: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Tạo bộ câu hỏi trắc nghiệm có tích hợp Cache siêu tốc (0.05s).
@@ -123,9 +133,9 @@ class QuizGenerator:
                         "shuffled": shuffle
                     }
 
-        # 2. Nếu chưa có Cache hoặc cache chưa đủ số câu: Sinh trọn vẹn pool 20 câu để nạp đầy đủ
-        safe_context = context_text[:5500]
-        actual_generate_count = max(min(num_questions, 20), 20)  # Sinh pool 20 câu để dùng chung và đảo ngẫu nhiên khi thi lại
+        # 2. Nếu chưa có Cache: Sinh đúng số lượng câu hỏi yêu cầu (tối đa 15 câu)
+        safe_context = context_text[:4500]
+        actual_generate_count = max(3, min(num_questions, 15))
 
         diff_instructions = {
             "Dễ": "Mức độ Dễ: Tập trung vào các định nghĩa, thuật ngữ và khái niệm cơ bản được nêu trực tiếp trong bài.",
@@ -168,7 +178,8 @@ Bắt buộc trả về đúng định dạng JSON có khóa "questions":
             prompt=prompt, 
             system_prompt=QUIZ_SYSTEM_PROMPT, 
             max_tokens=calc_tokens,
-            num_ctx=4096
+            num_ctx=4096,
+            preferred_model=preferred_model
         )
 
         res["document_title"] = doc_name
@@ -193,22 +204,55 @@ Bắt buộc trả về đúng định dạng JSON có khóa "questions":
         num_cards: int = 6
     ) -> Dict[str, Any]:
         """
-        Tạo bộ Flashcard học nhanh.
+        Tạo bộ Flashcard học nhanh chuẩn front/back.
         """
         safe_context = context_text[:10000]
-        prompt = f"""Dựa vào nội dung tài liệu:
+        prompt = f"""Dựa vào nội dung tài liệu sau:
 \"\"\"
 {safe_context}
 \"\"\"
 
-Trích xuất {num_cards} thuật ngữ quan trọng nhất. Bắt buộc trả về đúng cấu trúc JSON sau:
+YÊU CẦU BẮT BUỘC: Trích xuất ĐẦY ĐỦ {num_cards} thẻ ghi nhớ quan trọng nhất (đánh số id từ 1 đến {num_cards}). Tuyệt đối không dừng lại ở 1 thẻ!
+Mỗi thẻ gồm:
+- "id": Số thứ tự từ 1 đến {num_cards}
+- "front": Tên thuật ngữ, khái niệm ngắn gọn (dưới 10 từ)
+- "back": Định nghĩa cốt lõi (1-2 câu súc tích)
+- "category": Tên chủ đề
+
+Bắt buộc trả về đúng định dạng mảng JSON gồm {num_cards} phần tử:
 [
   {{
     "id": 1,
-    "front": "Thuật ngữ / Khái niệm",
-    "back": "Định nghĩa và ý nghĩa cốt lõi",
+    "front": "Thuật ngữ 1",
+    "back": "Định nghĩa cốt lõi 1",
+    "category": "Chủ đề"
+  }},
+  {{
+    "id": 2,
+    "front": "Thuật ngữ 2",
+    "back": "Định nghĩa cốt lõi 2",
     "category": "Chủ đề"
   }}
 ]"""
-        res = self.llm_service.generate_json(prompt=prompt, system_prompt=QUIZ_SYSTEM_PROMPT)
+        res = self.llm_service.generate_json(
+            prompt=prompt, 
+            system_prompt=FLASHCARD_SYSTEM_PROMPT,
+            max_tokens=max(1500, num_cards * 160)
+        )
+
+        if res.get("success") and isinstance(res.get("data"), list):
+            normalized = []
+            for idx, c in enumerate(res["data"][:num_cards], 1):
+                if isinstance(c, dict):
+                    front = c.get("front") or c.get("term") or c.get("question") or c.get("concept") or c.get("title") or "Khái niệm"
+                    back = c.get("back") or c.get("definition") or c.get("answer") or c.get("explanation") or c.get("meaning") or ""
+                    category = c.get("category") or c.get("topic") or "Khái niệm quan trọng"
+                    normalized.append({
+                        "id": idx,
+                        "front": str(front).strip(),
+                        "back": str(back).strip(),
+                        "category": str(category).strip()
+                    })
+            res["data"] = normalized
+
         return res

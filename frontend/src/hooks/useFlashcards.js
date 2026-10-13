@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import axios, { API_BASE } from '../api/client';
 
-export function useFlashcards() {
+export function useFlashcards({ showAlert } = {}) {
   const [fcDoc, setFcDoc] = useState(() => localStorage.getItem('smartstudy_fc_doc') || '');
   const [numCards, setNumCards] = useState(6);
   const [flashcards, setFlashcards] = useState(null);
@@ -11,7 +11,11 @@ export function useFlashcards() {
   const handleGenerateFlashcards = async (overrideDoc = null) => {
     const targetDoc = (typeof overrideDoc === 'string' && overrideDoc.trim()) ? overrideDoc : fcDoc;
     if (!targetDoc) {
-      alert('Vui lòng chọn tài liệu để tạo Thẻ ghi nhớ!');
+      if (showAlert) {
+        showAlert({ title: 'Chưa chọn bài học 🃏', message: 'Vui lòng chọn tài liệu để tạo bộ Thẻ ghi nhớ!', type: 'warning' });
+      } else {
+        alert('Vui lòng chọn tài liệu để tạo Thẻ ghi nhớ!');
+      }
       return;
     }
     setFcLoading(true);
@@ -24,10 +28,19 @@ export function useFlashcards() {
       if (res.data.success && Array.isArray(res.data.data)) {
         setFlashcards(res.data.data);
       } else {
-        alert('Không thể tạo thẻ ghi nhớ. Vui lòng thử lại!');
+        if (showAlert) {
+          showAlert({ title: 'Tạo thẻ chưa thành công ⚠️', message: 'Không thể tạo thẻ ghi nhớ từ tài liệu này. Vui lòng bấm thử lại!', type: 'warning' });
+        } else {
+          alert('Không thể tạo thẻ ghi nhớ. Vui lòng thử lại!');
+        }
       }
     } catch (err) {
-      alert('Lỗi: ' + (err.response?.data?.detail || err.message));
+      const errMsg = err.response?.data?.detail || err.message;
+      if (showAlert) {
+        showAlert({ title: 'Lỗi kết nối ❌', message: 'Không thể tạo thẻ ghi nhớ: ' + errMsg, type: 'error' });
+      } else {
+        alert('Lỗi: ' + errMsg);
+      }
     } finally {
       setFcLoading(false);
     }

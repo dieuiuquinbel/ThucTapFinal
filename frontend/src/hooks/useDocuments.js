@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import axios, { API_BASE } from '../api/client';
 
-export function useDocuments({ onDocsLoaded, onDocDeleted } = {}) {
+export function useDocuments({ onDocsLoaded, onDocDeleted, showConfirm, showAlert } = {}) {
   const [systemStatus, setSystemStatus] = useState(null);
   const [documents, setDocuments] = useState([]);
   const [selectedDocFilter, setSelectedDocFilter] = useState('Tất cả tài liệu');
@@ -62,25 +62,23 @@ export function useDocuments({ onDocsLoaded, onDocDeleted } = {}) {
     const progressTimer = setInterval(() => {
       const elapsed = Math.round((Date.now() - uploadStartTime) / 1000);
       setUploadProgress(prev => {
-        if (prev < 20) {
+        const current = Math.round(prev);
+        if (current < 25) {
           setUploadStep(`Đang trích xuất văn bản... (${elapsed}s)`);
-          return prev + 3;
-        } else if (prev < 50) {
-          setUploadStep(`Đang nhúng vector BGE-M3 qua Ollama... (${elapsed}s)`);
-          return prev + 2;
-        } else if (prev < 75) {
-          setUploadStep(`Đang nhúng vector & lưu ChromaDB... (${elapsed}s)`);
-          return prev + 1;
-        } else if (prev < 90) {
-          setUploadStep(`Đang đồng bộ hóa ChromaDB... (${elapsed}s)`);
-          return prev + 0.5;
-        } else if (prev < 98) {
+          return current + 5;
+        } else if (current < 60) {
+          setUploadStep(`Đang nhúng vector BGE-M3... (${elapsed}s)`);
+          return current + 4;
+        } else if (current < 85) {
+          setUploadStep(`Đang lưu chỉ mục ChromaDB... (${elapsed}s)`);
+          return current + 2;
+        } else if (current < 95) {
           setUploadStep(`Sắp hoàn tất, vui lòng chờ... (${elapsed}s)`);
-          return prev + 0.2;
+          return current + 1;
         }
-        return prev;
+        return 95;
       });
-    }, 1000);
+    }, 800);
 
     try {
       const res = await axios.post(`${API_BASE}/upload`, formData, {
@@ -93,7 +91,11 @@ export function useDocuments({ onDocsLoaded, onDocDeleted } = {}) {
       const failed = res.data?.details?.filter(d => d.status === 'error') || [];
       if (failed.length > 0) {
         const errorMsgs = failed.map(f => `• ${f.filename}: ${f.error}`).join('\n');
-        alert(`Thông báo tải tài liệu:\n${errorMsgs}`);
+        if (showAlert) {
+          showAlert({ title: 'Thông báo tải tài liệu ⚠️', message: errorMsgs, type: 'warning' });
+        } else {
+          alert(`Thông báo tải tài liệu:\n${errorMsgs}`);
+        }
       }
 
       setUploadProgress(100);
@@ -111,12 +113,22 @@ export function useDocuments({ onDocsLoaded, onDocDeleted } = {}) {
         setUploadProgress(0);
         setUploadStep('');
       } else if (err.code === 'ECONNABORTED') {
-        alert('Quá thời gian xử lý (>180s). Hãy thử tải lên tài liệu nhỏ hơn hoặc kiểm tra Ollama.');
+        const timeoutMsg = 'Quá thời gian xử lý (>180s). Hãy thử tải lên tài liệu nhỏ hơn hoặc kiểm tra Ollama.';
+        if (showAlert) {
+          showAlert({ title: 'Quá thời gian xử lý ⏳', message: timeoutMsg, type: 'warning' });
+        } else {
+          alert(timeoutMsg);
+        }
         setUploading(false);
         setUploadProgress(0);
         setUploadStep('');
       } else {
-        alert('Lỗi khi xử lý tài liệu: ' + (err.response?.data?.detail || err.message));
+        const errMsg = 'Lỗi khi xử lý tài liệu: ' + (err.response?.data?.detail || err.message);
+        if (showAlert) {
+          showAlert({ title: 'Lỗi tải tệp tin ❌', message: errMsg, type: 'error' });
+        } else {
+          alert(errMsg);
+        }
         setUploading(false);
         setUploadProgress(0);
         setUploadStep('');
@@ -127,16 +139,35 @@ export function useDocuments({ onDocsLoaded, onDocDeleted } = {}) {
     }
   };
 
-  const handleDeleteDoc = async (sourceName) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa tài liệu "${sourceName}"?\nHệ thống sẽ xóa toàn bộ vector, cache tóm tắt và cache đề thi tương ứng.`)) return;
-    try {
-      await axios.delete(`${API_BASE}/documents/${encodeURIComponent(sourceName)}`);
-      if (onDocDeleted) {
-        onDocDeleted(sourceName);
+  const handleDeleteDoc = (sourceName) => {
+    const doDelete = async () => {
+      try {
+        await axios.delete(`${API_BASE}/documents/${encodeURIComponent(sourceName)}`);
+        if (onDocDeleted) {
+          onDocDeleted(sourceName);
+        }
+        await fetchStatusAndDocs();
+      } catch (err) {
+        if (showAlert) {
+          showAlert({ title: 'Lỗi xóa tài liệu ❌', message: 'Lỗi: ' + err.message, type: 'error' });
+        } else {
+          alert('Lỗi khi xóa tài liệu: ' + err.message);
+        }
       }
-      await fetchStatusAndDocs();
-    } catch (err) {
-      alert('Lỗi khi xóa tài liệu: ' + err.message);
+    };
+
+    if (showConfirm) {
+      showConfirm({
+        title: 'Xác nhận xóa tài liệu 🗑️',
+        message: `Bạn có chắc chắn muốn xóa tài liệu "${sourceName}"?\nHệ thống sẽ xóa toàn bộ vector, cache tóm tắt và cache đề thi tương ứng.`,
+        confirmText: 'Đồng ý xóa',
+        cancelText: 'Hủy bỏ',
+        confirmVariant: 'danger',
+        onConfirm: doDelete
+      });
+    } else {
+      if (!window.confirm(`Bạn có chắc chắn muốn xóa tài liệu "${sourceName}"?`)) return;
+      doDelete();
     }
   };
 

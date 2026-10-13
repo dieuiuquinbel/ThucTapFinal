@@ -12,22 +12,36 @@ logger = logging.getLogger(__name__)
 FOLLOW_UP_INDICATORS = [
     "nó", "chúng", "cái đó", "điều đó", "ở trên", "vừa nói",
     "kể thêm", "nói rõ hơn", "còn gì nữa", "chi tiết hơn",
+    "cho ví dụ", "giải thích thêm", "phần đó", "mục đó",
     "them", "those", "that", "it", "its"
+]
+
+# Các từ để hỏi nối tiếp rất ngắn (chỉ dùng khi câu < 20 ký tự)
+SHORT_FOLLOWUP_PATTERNS = [
+    r'^tại\s+sao\??$', r'^vì\s+sao\??$', r'^sao\s+vậy\??$',
+    r'^còn\s+gì\s+nữa\??$', r'^rồi\s+sao\??$', r'^tiếp\s+đi\??$',
+    r'^cho\s+ví\s+dụ\??$', r'^ví\s+dụ\??$',
 ]
 
 
 def is_follow_up_query(query: str) -> bool:
     """
-    Chỉ coi là câu hỏi tiếp nối khi câu hỏi thật sự thiếu tân ngữ/chủ ngữ độc lập:
-    1. Câu cực ngắn (< 15 ký tự, ví dụ: 'còn gì nữa?', 'tại sao?')
+    Chỉ coi là câu hỏi tiếp nối khi:
+    1. Câu cực ngắn VÀ khớp mẫu hỏi nối tiếp rõ ràng (tại sao?, còn gì nữa?)
     2. Chứa đại từ chỉ thị thay thế rõ ràng (nó, cái đó, điều đó...)
-    Không bắt các từ 'các', 'những', 'tại sao' ở câu độc lập.
+    KHÔNG coi câu ngắn bất kỳ là follow-up (tránh bắt nhầm lời khen, xác nhận).
     """
     q = query.strip().lower()
-    if len(q) < 15:
-        return True
-    
-    # Kiểm tra theo ranh giới từ (word boundary) thay vì substring thông thường
+
+    # Câu cực ngắn: chỉ coi là follow-up nếu khớp mẫu hỏi nối tiếp cụ thể
+    if len(q) < 20:
+        for pattern in SHORT_FOLLOWUP_PATTERNS:
+            if re.search(pattern, q):
+                return True
+        # Câu ngắn mà không khớp mẫu nối tiếp -> KHÔNG phải follow-up
+        # (ví dụ: "giỏi quá", "ok", "cảm ơn" sẽ không bị bắt)
+
+    # Kiểm tra đại từ chỉ thị theo ranh giới từ (word boundary)
     for indicator in FOLLOW_UP_INDICATORS:
         if re.search(rf'\b{re.escape(indicator)}\b', q):
             return True
@@ -43,7 +57,7 @@ def reformulate_query(current_query: str, history: List[Dict[str, str]]) -> str:
         Current: "Bao gồm những tầng nào?"
         → Reformulated: "Mô hình OSI bao gồm những tầng nào?"
     """
-    if not history:
+    if not history or not is_follow_up_query(current_query):
         return current_query
     
     # Lấy câu hỏi user gần nhất từ history
@@ -101,24 +115,84 @@ def format_history_for_prompt(history: List[Dict[str, str]], max_turns: int = 3)
     return "\n".join(lines)
 
 
-# Các mẫu câu chào hỏi / giao tiếp xã giao thông thường
+# --- Nhận diện Giao tiếp Xã giao & Lời khen (Zero-latency Chit-chat) ---
+
+# Mẫu chào hỏi
 GREETING_PATTERNS = [
-    r'^(xin\s+)?chào(\s+bạn|\s+ad|\s+bot|\s+trợ\s+lý)?[\s!\.\?]*$',
+    r'^(xin\s+)?chào(\s+bạn|\s+ad|\s+bot|\s+trợ\s+lý|\s+nha|\s+nhé)?[\s!\.\?]*$',
     r'^(hello|hi|hey)[\s!\.\?]*$',
     r'^(bạn\s+là\s+ai|bạn\s+có\s+thể\s+làm\s+gì|giới\s+thiệu\s+bản\s+thân)[\s!\.\?]*$',
-    r'^(cảm\s+ơn|thanks|thank\s+you)[\s!\.\?]*$'
 ]
+
+# Mẫu khen ngợi / tán thưởng
+PRAISE_PATTERNS = [
+    r'(giỏi|hay|tuyệt|tốt|chuẩn|chất|xuất\s*sắc|pro|siêu|đỉnh|quá\s+xịn|phê|max|10\s+điểm|mười\s+điểm)',
+    r'(trả\s+lời\s+hay|trả\s+lời\s+tốt|trả\s+lời\s+đúng|đúng\s+rồi|chính\s+xác)',
+    r'(thông\s+minh|thật\s+giỏi|quá\s+giỏi|ghê\s+thật|ưng|ưng\s+quá)',
+    r'(good|great|nice|awesome|amazing|perfect|well\s+done|cool|excellent)',
+]
+
+# Mẫu cảm ơn
+THANKS_PATTERNS = [
+    r'(cảm\s+ơn|cám\s+ơn|thanks|thank\s+you|tks|tky|thankiu|cám\s+ơn\s+nhiều)',
+]
+
+# Mẫu xác nhận / đồng ý ngắn
+ACK_PATTERNS = [
+    r'^(ok|okie|oke|okay|ừ|ừm|uhm|uh|vâng|dạ|được|được\s+rồi|hiểu\s+rồi|hiểu|rõ|ra\s+rồi|ổn|hợp\s+lý|đồng\s+ý)[\s!\.\?]*$',
+]
+
+# Các từ để hỏi — nếu câu chứa từ này thì KHÔNG phải chitchat dù có từ khen
+QUESTION_INDICATORS = [
+    r'\?', r'\blà\s+gì\b', r'\btại\s+sao\b', r'\bvì\s+sao\b', r'\bnhư\s+thế\s+nào\b',
+    r'\bbao\s+nhiêu\b', r'\bmấy\b', r'\bở\s+đâu\b', r'\bkhi\s+nào\b', r'\bcái\s+gì\b',
+    r'\bwhat\b', r'\bwhy\b', r'\bhow\b', r'\bwhere\b', r'\bwhen\b',
+    r'\bgiải\s+thích\b', r'\bphân\s+tích\b', r'\bso\s+sánh\b', r'\btrình\s+bày\b',
+    r'\bcho\s+biết\b', r'\bnêu\b', r'\bliệt\s+kê\b', r'\bviết\b', r'\btính\b',
+    r'\bhãy\b', r'\blàm\s+sao\b', r'\bcách\b',
+]
+
+
+def _has_question_intent(q: str) -> bool:
+    """Kiểm tra câu có chứa ý định hỏi kiến thức hay không."""
+    for pattern in QUESTION_INDICATORS:
+        if re.search(pattern, q):
+            return True
+    return False
+
 
 def is_conversational_query(query: str) -> Optional[str]:
     """
-    Nhận diện câu chào hỏi, giao tiếp cơ bản để trả lời tự nhiên mà không ép tìm trong tài liệu.
+    Nhận diện câu chào hỏi, khen ngợi, cảm ơn, xác nhận để trả lời tự nhiên
+    mà không ép tìm trong tài liệu. Có guardrail: nếu câu chứa ý định hỏi
+    kiến thức (có dấu ?, từ để hỏi...) thì bỏ qua và đi vào luồng RAG.
     """
     q = query.strip().lower()
+
+    # Guardrail: nếu có ý định hỏi kiến thức -> không phải chitchat
+    if _has_question_intent(q):
+        return None
+
+    # 1. Chào hỏi
     for pattern in GREETING_PATTERNS:
         if re.search(pattern, q):
-            if "cảm ơn" in q or "thank" in q:
-                return "Rất vui được hỗ trợ bạn! Nếu có câu hỏi nào về nội dung tài liệu học tập, bạn cứ hỏi tôi nhé."
-            return "Xin chào! Bạn có thể đặt câu hỏi về nội dung tài liệu đã tải lên, hoặc sử dụng các tính năng Luyện thi trắc nghiệm và Tóm tắt ở các tab phía trên để ôn tập nhé."
+            return "Xin chào bạn! 👋 Mình là StudyEdu — trợ lý học tập của bạn. Bạn có thể hỏi mình bất kỳ câu hỏi nào về bài học, hoặc dùng các tab Luyện thi, Thẻ ghi nhớ và Tóm tắt phía trên để ôn tập nhé! 📚✨"
+
+    # 2. Cảm ơn
+    for pattern in THANKS_PATTERNS:
+        if re.search(pattern, q):
+            return "Không có gì đâu nè! 🌟 Rất vui vì đã giúp được bạn. Chúc bạn ôn bài thật hiệu quả và đạt điểm cao nhé! 🚀"
+
+    # 3. Khen ngợi / tán thưởng
+    for pattern in PRAISE_PATTERNS:
+        if re.search(pattern, q):
+            return "Cảm ơn bạn nhiều nhé! 🥰 Rất vui vì câu trả lời đã hữu ích. Nếu cần giải thích thêm phần nào hoặc muốn luyện thi thử, cứ nhắn mình nhé! ✨"
+
+    # 4. Xác nhận / đồng ý ngắn
+    for pattern in ACK_PATTERNS:
+        if re.search(pattern, q):
+            return "Tuyệt vời! 👍 Bạn cứ tiếp tục ôn bài nhé, mình luôn ở đây sẵn sàng hỗ trợ! 📚"
+
     return None
 
 
@@ -129,7 +203,36 @@ QUY TẮC BẮT BUỘC ĐỂ ĐẢM BẢO TÍNH HỌC THUẬT VÀ TRUNG THỰC:
 2. BẮT BUỘC DẪN NGUỒN: Mỗi luận điểm, định nghĩa hoặc số liệu, bạn BẮT BUỘC phải ghi kèm số hiệu nguồn [1], [2]... ngay sau câu đó (ví dụ: "TCP là giao thức hướng kết nối [1].").
 3. TRƯỜNG HỢP KHÔNG ĐỦ THÔNG TIN: Nếu ngữ cảnh không có thông tin hoặc không đủ tài liệu để trả lời, hãy trả lời chính xác:
    "Tài liệu hiện tại không có thông tin về vấn đề này. Bạn có thể mở rộng phạm vi tìm kiếm hoặc chọn tài liệu khác."
-4. TRÌNH BÀY MẠCH LẠC: Trình bày súc tích bằng các tiêu đề in đậm và gạch đầu dòng rõ ràng. Tuyệt đối không tự bịa danh sách nguồn ở cuối câu trả lời."""
+4. TRÁNH LẶP TỪ & LẶP Ý (CỰC KỲ QUAN TRỌNG): Tuyệt đối KHÔNG lặp lại định nghĩa, không nhắc lại cùng một câu mở đầu hay chép lại các tiêu đề mục trùng nhau giữa các đoạn nguồn. Hãy tổng hợp (synthesize) thành một bài phân tích liền mạch, súc tích, đi thẳng vào trọng tâm câu hỏi.
+5. TRÌNH BÀY MẠCH LẠC: Trình bày rõ ràng bằng các tiêu đề in đậm và gạch đầu dòng súc tích. Tuyệt đối không tự bịa danh sách nguồn ở cuối câu trả lời."""
+
+
+def is_direct_general_query(query: str) -> bool:
+    """
+    Nhận diện nhanh các câu hỏi toán học / tính toán cơ bản để bypass vector search,
+    giúp trả lời ngay lập tức mà không cần nạp context tài liệu.
+    """
+    q = query.strip().lower()
+    # Phép toán cơ bản ví dụ: 1+1, 1 + 1 = mấy, 2*3 = ?, 100/4...
+    if re.search(r'^\s*(\-?\d+[\d\.\,]*)\s*[\+\-\*\/\^\%x]\s*(\-?\d+[\d\.\,]*)', q):
+        return True
+    if re.search(r'^(tính|giải)\s+[\d\.\,\s\+\-\*\/\^\%\(\)\=]+', q):
+        return True
+    return False
+
+
+GENERAL_KNOWLEDGE_SYSTEM_PROMPT = """Bạn là StudyEdu — trợ lý học tập thông minh dành cho sinh viên đại học.
+Người dùng đang hỏi một câu hỏi KHÔNG nằm trong tài liệu đã tải lên.
+Hãy trả lời bằng kiến thức phổ thông của bạn một cách chính xác, mạch lạc và hữu ích.
+
+QUY TẮC:
+1. Trả lời trực tiếp, đi thẳng vào câu hỏi.
+2. Trình bày rõ ràng bằng tiêu đề in đậm và gạch đầu dòng súc tích nếu câu trả lời dài.
+3. Nếu là câu hỏi tính toán, cho kết quả chính xác kèm giải thích ngắn.
+4. Nếu là câu hỏi viết code, cho code hoạt động ngay kèm chú thích.
+5. KHÔNG bịa trích dẫn [1], [2]... vì đây không phải nguồn tài liệu.
+6. Trả lời bằng tiếng Việt (trừ khi người dùng hỏi bằng tiếng Anh).
+7. Cuối câu trả lời, KHÔNG cần nhắc nhở người dùng tải tài liệu hay dùng chức năng khác."""
 
 
 class RAGPipeline:
@@ -194,7 +297,8 @@ class RAGPipeline:
         query: str,
         top_k: int = 4,
         filter_source: Optional[str] = None,
-        history: Optional[List[Dict[str, str]]] = None
+        history: Optional[List[Dict[str, str]]] = None,
+        preferred_model: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Thực hiện quy trình RAG có nhớ ngữ cảnh hội thoại:
@@ -214,6 +318,26 @@ class RAGPipeline:
                 "success": True
             }
 
+        # Nếu là câu hỏi toán học / tính toán cơ bản rõ ràng, trả lời ngay qua General Knowledge
+        if is_direct_general_query(query):
+            logger.info(f"[RAG] Phát hiện câu hỏi tính toán cơ bản → gọi trực tiếp General Knowledge cho: '{query}'")
+            res = self.llm_service.generate(
+                prompt=query,
+                system_prompt=GENERAL_KNOWLEDGE_SYSTEM_PROMPT,
+                max_tokens=1024,
+                preferred_model=preferred_model
+            )
+            prefix = "💡 *Nội dung này không có trong tài liệu đã tải lên. StudyEdu trả lời dựa trên kiến thức phổ thông:*\n\n"
+            return {
+                "answer": prefix + res.get("text", ""),
+                "sources": [],
+                "raw_retrieved": [],
+                "model_used": res.get("model_used", "Unknown"),
+                "is_fallback": True,
+                "latency_sec": res.get("latency_sec", 0),
+                "success": res.get("success", False)
+            }
+
         # Reformulate nếu là câu hỏi tiếp nối
         search_query = query
         if history and is_follow_up_query(query):
@@ -227,13 +351,33 @@ class RAGPipeline:
         )
 
         if not retrieved:
+            # --- General Knowledge Fallback ---
+            # Thay vì báo lỗi cụt lủn, cho LLM trả lời bằng kiến thức phổ thông
+            logger.info(f"[RAG] Không tìm thấy tài liệu phù hợp → kích hoạt General Knowledge Fallback cho: '{query}'")
+            use_history = history and is_follow_up_query(query)
+            history_str = format_history_for_prompt(history) if use_history else ""
+            if history_str:
+                gk_prompt = f"{history_str}\n\n[CÂU HỎI]\n{query}\n\nHãy trả lời câu hỏi trên một cách chính xác và hữu ích:"
+            else:
+                gk_prompt = query
+
+            res = self.llm_service.generate(
+                prompt=gk_prompt,
+                system_prompt=GENERAL_KNOWLEDGE_SYSTEM_PROMPT,
+                max_tokens=1024,
+                preferred_model=preferred_model
+            )
+            # Thêm chú thích nguồn gốc câu trả lời
+            answer_text = res.get("text", "")
+            prefix = "💡 *Nội dung này không có trong tài liệu đã tải lên. StudyEdu trả lời dựa trên kiến thức phổ thông:*\n\n"
             return {
-                "answer": "Không tìm thấy thông tin phù hợp trong tài liệu đã tải lên (độ tương đồng ngữ nghĩa thấp).",
+                "answer": prefix + answer_text,
                 "sources": [],
-                "model_used": "None",
-                "is_fallback": False,
-                "latency_sec": 0,
-                "success": True
+                "raw_retrieved": [],
+                "model_used": res.get("model_used", "Unknown"),
+                "is_fallback": True,
+                "latency_sec": res.get("latency_sec", 0),
+                "success": res.get("success", False)
             }
 
         context_str = self.format_context(retrieved)
@@ -247,9 +391,9 @@ class RAGPipeline:
 [CÂU HỎI]
 {query}
 
-Dựa vào các đoạn nguồn trên, hãy trả lời ĐẦY ĐỦ, CHI TIẾT và TOÀN DIỆN, phân tích rõ từng ý/mục và ghi rõ số trích dẫn [1], [2]... ngay sau thông tin tương ứng:"""
+Dựa vào các đoạn nguồn trên, hãy tổng hợp câu trả lời mạch lạc, súc tích, TUYỆT ĐỐI KHÔNG lặp lại câu từ hay định nghĩa, đi thẳng vào trọng tâm và ghi rõ số trích dẫn [1], [2]... ngay sau thông tin tương ứng:"""
 
-        res = self.llm_service.generate(prompt=prompt, system_prompt=RAG_SYSTEM_PROMPT, max_tokens=1024)
+        res = self.llm_service.generate(prompt=prompt, system_prompt=RAG_SYSTEM_PROMPT, max_tokens=1024, preferred_model=preferred_model)
         
         # Chỉ trả về nguồn thật sự được trích dẫn trong văn bản
         actually_used_sources = self.filter_actually_cited_sources(res["text"], retrieved)
@@ -269,7 +413,8 @@ Dựa vào các đoạn nguồn trên, hãy trả lời ĐẦY ĐỦ, CHI TIẾT
         query: str,
         top_k: int = 4,
         filter_source: Optional[str] = None,
-        history: Optional[List[Dict[str, str]]] = None
+        history: Optional[List[Dict[str, str]]] = None,
+        preferred_model: Optional[str] = None
     ):
         """
         Streaming trả lời RAG có nhớ ngữ cảnh hội thoại:
@@ -282,6 +427,21 @@ Dựa vào các đoạn nguồn trên, hãy trả lời ĐẦY ĐỦ, CHI TIẾT
         if conv_reply:
             yield {"type": "token", "token": conv_reply}
             yield {"type": "meta", "sources": [], "model": self.llm_service.active_model}
+            return
+
+        # Nếu là câu hỏi toán học / tính toán cơ bản rõ ràng, stream trực tiếp qua General Knowledge
+        if is_direct_general_query(query):
+            logger.info(f"[RAG Stream] Phát hiện câu hỏi tính toán cơ bản → gọi trực tiếp General Knowledge cho: '{query}'")
+            prefix = "💡 *Nội dung này không có trong tài liệu đã tải lên. StudyEdu trả lời dựa trên kiến thức phổ thông:*\n\n"
+            yield {"type": "token", "token": prefix}
+            for token in self.llm_service.generate_stream(
+                prompt=query,
+                system_prompt=GENERAL_KNOWLEDGE_SYSTEM_PROMPT,
+                max_tokens=1024,
+                preferred_model=preferred_model
+            ):
+                yield {"type": "token", "token": token}
+            yield {"type": "meta", "sources": [], "model": self.llm_service.active_model, "is_fallback": True}
             return
 
         # Reformulate nếu là câu hỏi tiếp nối
@@ -297,8 +457,29 @@ Dựa vào các đoạn nguồn trên, hãy trả lời ĐẦY ĐỦ, CHI TIẾT
         )
 
         if not retrieved:
-            yield {"type": "token", "token": "Không tìm thấy thông tin phù hợp trong tài liệu đã tải lên (độ tương đồng ngữ nghĩa thấp)."}
-            yield {"type": "meta", "sources": [], "model": "None"}
+            # --- General Knowledge Fallback (Streaming) ---
+            logger.info(f"[RAG Stream] Không tìm thấy tài liệu → kích hoạt General Knowledge Fallback cho: '{query}'")
+            use_history = history and is_follow_up_query(query)
+            history_str = format_history_for_prompt(history) if use_history else ""
+            if history_str:
+                gk_prompt = f"{history_str}\n\n[CÂU HỎI]\n{query}\n\nHãy trả lời câu hỏi trên một cách chính xác và hữu ích:"
+            else:
+                gk_prompt = query
+
+            # Stream prefix chú thích trước
+            prefix = "💡 *Nội dung này không có trong tài liệu đã tải lên. StudyEdu trả lời dựa trên kiến thức phổ thông:*\n\n"
+            yield {"type": "token", "token": prefix}
+
+            # Stream câu trả lời từ LLM
+            for token in self.llm_service.generate_stream(
+                prompt=gk_prompt,
+                system_prompt=GENERAL_KNOWLEDGE_SYSTEM_PROMPT,
+                max_tokens=1024,
+                preferred_model=preferred_model
+            ):
+                yield {"type": "token", "token": token}
+
+            yield {"type": "meta", "sources": [], "model": self.llm_service.active_model, "is_fallback": True}
             return
 
         context_str = self.format_context(retrieved)
@@ -312,10 +493,10 @@ Dựa vào các đoạn nguồn trên, hãy trả lời ĐẦY ĐỦ, CHI TIẾT
 [CÂU HỎI]
 {query}
 
-Dựa vào các đoạn nguồn trên, hãy trả lời ĐẦY ĐỦ, CHI TIẾT và TOÀN DIỆN, phân tích rõ từng ý/mục và ghi rõ số trích dẫn [1], [2]... ngay sau thông tin tương ứng:"""
+Dựa vào các đoạn nguồn trên, hãy tổng hợp câu trả lời mạch lạc, súc tích, TUYỆT ĐỐI KHÔNG lặp lại câu từ hay định nghĩa, đi thẳng vào trọng tâm và ghi rõ số trích dẫn [1], [2]... ngay sau thông tin tương ứng:"""
 
         accumulated_text = ""
-        for token in self.llm_service.generate_stream(prompt=prompt, system_prompt=RAG_SYSTEM_PROMPT, max_tokens=1024):
+        for token in self.llm_service.generate_stream(prompt=prompt, system_prompt=RAG_SYSTEM_PROMPT, max_tokens=1024, preferred_model=preferred_model):
             accumulated_text += token
             yield {"type": "token", "token": token}
 

@@ -7,12 +7,14 @@ import { useChat } from './hooks/useChat';
 import { useQuiz } from './hooks/useQuiz';
 import { useFlashcards } from './hooks/useFlashcards';
 import { useSummary } from './hooks/useSummary';
+import { useNoticeModal } from './hooks/useNoticeModal';
 
 // Layout & Modals
 import Sidebar from './components/layout/Sidebar';
 import Navbar from './components/layout/Navbar';
 import AuthModal from './components/modals/AuthModal';
 import QuizHistoryModal from './components/modals/QuizHistoryModal';
+import NoticeModal from './components/modals/NoticeModal';
 
 // Features / Tabs
 import ChatTab from './features/chat/ChatTab';
@@ -32,20 +34,25 @@ export default function App() {
     try { localStorage.setItem('smartstudy_active_tab', tab); } catch (_) {}
   };
 
+  // Hệ thống thông báo học tập dạng bảng vẽ pastel
+  const noticeModal = useNoticeModal();
+
   // 1. Quản lý Auth & Học viên
-  const auth = useAuth();
+  const auth = useAuth({ showAlert: noticeModal.showAlert });
 
   // 2. Nghiệp vụ Quiz
-  const quiz = useQuiz({ currentUser: auth.currentUser });
+  const quiz = useQuiz({ currentUser: auth.currentUser, showAlert: noticeModal.showAlert });
 
   // 3. Nghiệp vụ Thẻ ghi nhớ (Flashcards)
-  const flashcards = useFlashcards();
+  const flashcards = useFlashcards({ showAlert: noticeModal.showAlert });
 
   // 4. Nghiệp vụ Sổ tay Tóm tắt
-  const summary = useSummary();
+  const summary = useSummary({ showAlert: noticeModal.showAlert });
 
   // 5. Quản lý Tài liệu & Upload
   const docs = useDocuments({
+    showConfirm: noticeModal.showConfirm,
+    showAlert: noticeModal.showAlert,
     onDocsLoaded: (loadedDocs) => {
       const availableSources = loadedDocs.map(d => d.source);
       const fallbackFirst = loadedDocs[0].source;
@@ -85,7 +92,8 @@ export default function App() {
   // 6. Nghiệp vụ Chat & Trợ lý AI
   const chat = useChat({
     selectedDocFilter: docs.selectedDocFilter,
-    systemStatus: docs.systemStatus
+    systemStatus: docs.systemStatus,
+    showConfirm: noticeModal.showConfirm
   });
 
   return (
@@ -116,6 +124,10 @@ export default function App() {
         onLogout={auth.handleLogout}
         onFetchQuizHistory={auth.handleFetchQuizHistory}
         onNavigateGuidelines={() => setActiveTab('guidelines')}
+        modelMode={chat.modelMode}
+        setModelMode={chat.setModelMode}
+        onLogoClick={() => setActiveTab('chat')}
+        showAlert={noticeModal.showAlert}
       />
 
       {/* Vùng học tập trung tâm */}
@@ -135,6 +147,8 @@ export default function App() {
             chatBottomRef={chat.chatBottomRef}
             onSendMessage={chat.handleSendMessage}
             onNewChat={chat.handleNewChat}
+            modelMode={chat.modelMode}
+            setModelMode={chat.setModelMode}
           />
         )}
 
@@ -219,6 +233,19 @@ export default function App() {
         onClose={() => auth.setQuizHistoryModalOpen(false)}
         currentUser={auth.currentUser}
         quizHistoryList={auth.quizHistoryList}
+      />
+
+      {/* Thông báo bảng học tập Pastel phong cách mây bay */}
+      <NoticeModal
+        isOpen={noticeModal.modalConfig.isOpen}
+        type={noticeModal.modalConfig.type}
+        title={noticeModal.modalConfig.title}
+        message={noticeModal.modalConfig.message}
+        confirmText={noticeModal.modalConfig.confirmText}
+        cancelText={noticeModal.modalConfig.cancelText}
+        confirmVariant={noticeModal.modalConfig.confirmVariant}
+        onConfirm={noticeModal.modalConfig.onConfirm}
+        onClose={noticeModal.closeModal}
       />
     </div>
   );

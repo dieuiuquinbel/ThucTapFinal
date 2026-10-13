@@ -42,7 +42,7 @@ embed_service = EmbeddingService(model_name="bge-m3")
 vector_store = VectorStore(persist_dir="chroma_db", embedding_service=embed_service)
 llm_service = LLMService(
     primary_model="qwen2.5:7b",
-    fallback_model="llama3.1:8b"
+    fallback_model="qwen2.5:3b"
 )
 rag_pipeline = RAGPipeline(vector_store=vector_store, llm_service=llm_service)
 quiz_gen = QuizGenerator(llm_service=llm_service)
@@ -59,6 +59,7 @@ class ChatRequest(BaseModel):
     filter_source: Optional[str] = "Tất cả tài liệu"
     top_k: Optional[int] = Field(default=4, ge=1, le=10)
     history: Optional[List[ChatMessage]] = None
+    model_mode: Optional[str] = "deep"  # "fast" (qwen2.5:3b) | "deep" (qwen2.5:7b)
 
 
 class QuizRequest(BaseModel):
@@ -132,7 +133,7 @@ def get_system_status():
     # Xác định status thực tế
     if not ollama_online:
         system_status = "offline"
-    elif "qwen2.5" not in installed_models and "llama3.1" not in installed_models:
+    elif "qwen2.5" not in installed_models:
         system_status = "no_models"
     elif is_fallback:
         system_status = "degraded"
@@ -145,7 +146,7 @@ def get_system_status():
         "active_model": curr_model,
         "is_fallback": is_fallback,
         "primary_model": "qwen2.5:7b",
-        "fallback_model": "llama3.1:8b",
+        "fallback_model": "qwen2.5:3b",
         "embedding_model": "bge-m3",
         "installed_models": installed_models,
         "total_documents": len(docs),
@@ -169,28 +170,56 @@ MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
 
 def precompute_study_assets(filename: str):
     """
-    Tiến trình chạy ngầm (Background Task - NotebookLM Style):
-    Tự động chuẩn bị trước Quiz và Tóm tắt vào Cache để người dùng truy cập tức thì.
+    Tiến trình chạy ngầm siêu tốc bằng Qwen 2.5 3B (~10-15s):
+    Chuẩn bị sẵn Tóm tắt & Quiz vào Cache bằng model 3B để:
+    1. Hoàn tất cực nhanh (10-15s thay vì 2 phút).
+    2. Dùng chung model 3B với Chat, không gây nghẽn hàng đợi hay tráo đổi VRAM trên GPU 6GB.
     """
+    import time
+    time.sleep(1.0)  # Để response upload trả về ngay lập tức cho client
     try:
-        chunks = vector_store.get_document_chunks_sampled(source_filename=filename, max_chunks=6)
+        chunks = vector_store.get_document_chunks_sampled(source_filename=filename, max_chunks=5)
         if not chunks:
             return
         combined_text = "\n\n".join([f"(Trang {c.get('page', 1)}): {c['text']}" for c in chunks])
         
-        # 1. ƯU TIÊN SỐ 1: Sinh sẵn Đề thi trắc nghiệm Quiz trọn bộ 15 câu 'Trung bình'
-        # Khi hoàn thành, người dùng chọn 5, 10 hay 15 câu đều được trả về tức thì từ cache
-        quiz_context = combined_text[:5000]
-        logger.info(f"[Background] Đang tạo cache Quiz 'Trung bình' (15 câu) cho {filename}...")
-        quiz_gen.generate_quiz(context_text=quiz_context, num_questions=15, difficulty="Trung bình", doc_name=filename)
+        # 1. Tóm tắt 'Trung bình' trước bằng 3B siêu tốc (~4s)
+        logger.info(f"[Background] Đang tạo cache Tóm tắt 'Trung bình' (3B siêu tốc) cho {filename}...")
+        summarizer.summarize(
+            text_content=combined_text[:3500], 
+            document_title=filename, 
+            summary_style="Trung bình",
+            preferred_model="qwen2.5:3b"
+        )
         
-        # 2. ƯU TIÊN SỐ 2: Tóm tắt 'Trung bình'
-        logger.info(f"[Background] Đang tạo cache Tóm tắt 'Trung bình' cho {filename}...")
-        summarizer.summarize(text_content=combined_text[:5000], document_title=filename, summary_style="Trung bình")
+        # 2. Sinh sẵn Đề thi trắc nghiệm Quiz 5 câu 'Trung bình' bằng 3B (~8s)
+        logger.info(f"[Background] Đang tạo cache Quiz 'Trung bình' 5 câu (3B siêu tốc) cho {filename}...")
+        quiz_gen.generate_quiz(
+            context_text=combined_text[:3500], 
+            num_questions=5, 
+            difficulty="Trung bình", 
+            doc_name=filename,
+            preferred_model="qwen2.5:3b"
+        )
         
         logger.info(f"[Background] HOÀN TẤT nạp cache khởi động nhanh cho {filename}!")
     except Exception as e:
         logger.warning(f"[Background Precompute] Không thể tạo cache trước cho {filename}: {e}")
+
+
+@app.post("/api/precompute/{filename}")
+def trigger_precompute(filename: str, background_tasks: BackgroundTasks):
+    """
+    Tiến trình nạp ngầm thông minh khi học viên rảnh tay đọc câu trả lời chat:
+    Chỉ nạp ngầm nếu tài liệu chưa có sẵn bộ nhớ đệm Cache.
+    """
+    cached_sum = summarizer.get_cached_summary(filename, "Trung bình")
+    cached_quiz = quiz_gen.get_cached_quiz(filename, "Trung bình")
+    if cached_sum and cached_quiz:
+        return {"status": "already_cached", "message": "Tài liệu đã có sẵn cache"}
+    
+    background_tasks.add_task(precompute_study_assets, filename)
+    return {"status": "scheduled", "message": f"Đang chuẩn bị ngầm đề thi và tóm tắt cho {filename}"}
 
 
 @app.post("/api/upload")
@@ -245,7 +274,7 @@ async def upload_documents(background_tasks: BackgroundTasks, files: List[Upload
             summarizer.delete_cache(file.filename)
             quiz_gen.delete_cache(file.filename)
 
-            chunks = chunk_document_pages(pages, chunk_size=1200, chunk_overlap=200)
+            chunks = chunk_document_pages(pages, chunk_size=800, chunk_overlap=150)
             t2 = time.time()
             logger.info(f"[Upload] Chunking {file.filename}: {len(chunks)} chunks trong {t2-t1:.1f}s")
             
@@ -256,8 +285,8 @@ async def upload_documents(background_tasks: BackgroundTasks, files: List[Upload
             
             total_chunks += added
             
-            # Kích hoạt chạy ngầm tạo trước Quiz và Tóm tắt vào Cache
-            background_tasks.add_task(precompute_study_assets, file.filename)
+            # Ưu tiên GPU 100% cho Demo Chat ngay sau khi tải file xong:
+            # Không tự ý chạy nền chiếm dụng GPU. Khi nào người dùng bấm sang Quiz / Tóm tắt mới sinh theo yêu cầu (On-Demand).
 
             results.append({
                 "filename": file.filename,
@@ -308,11 +337,13 @@ def chat_with_documents(req: ChatRequest):
     if not req.query.strip():
         raise HTTPException(status_code=400, detail="Câu hỏi không được để trống")
 
+    target_model = "qwen2.5:3b" if req.model_mode == "fast" else "qwen2.5:7b"
     resp = rag_pipeline.answer_query(
         query=req.query,
         top_k=req.top_k or 5,
         filter_source=req.filter_source,
-        history=[m.model_dump() for m in req.history] if req.history else None
+        history=[m.model_dump() for m in req.history] if req.history else None,
+        preferred_model=target_model
     )
     return resp
 
@@ -325,12 +356,14 @@ def chat_with_documents_stream(req: ChatRequest):
     if not req.query.strip():
         raise HTTPException(status_code=400, detail="Câu hỏi không được để trống")
 
+    target_model = "qwen2.5:3b" if req.model_mode == "fast" else "qwen2.5:7b"
     def event_generator():
         for event in rag_pipeline.answer_query_stream(
             query=req.query,
             top_k=req.top_k or 5,
             filter_source=req.filter_source,
-            history=[m.model_dump() for m in req.history] if req.history else None
+            history=[m.model_dump() for m in req.history] if req.history else None,
+            preferred_model=target_model
         ):
             yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
         yield "data: [DONE]\n\n"

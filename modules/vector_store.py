@@ -191,20 +191,26 @@ class VectorStore:
         else:
             reranked_results = rrf_top
 
-        # 5. Định dạng đầu ra sạch sẽ kèm metadata
+        # 5. Định dạng đầu ra sạch sẽ kèm metadata & lọc min_score
         final_chunks = []
-        for item in reranked_results[:top_k]:
+        for item in reranked_results:
+            score = item.get("final_score", round(item.get("semantic_score", 0.0), 4))
+            # Loại bỏ triệt để các đoạn văn bản có độ tương quan dưới ngưỡng tối thiểu
+            if min_score is not None and score < min_score:
+                continue
             meta = item.get("metadata", {})
             final_chunks.append({
                 "text": item["text"],
                 "metadata": meta,
-                "score": item.get("final_score", round(item.get("semantic_score", 0.0), 4)),
+                "score": score,
                 "semantic_score": round(item.get("semantic_score", 0.0), 4),
                 "bm25_score": item.get("bm25_score", 0.0),
                 "rerank_score": item.get("rerank_score", 0.0),
                 "page": meta.get("page", 1),
                 "source": meta.get("source", "Không rõ")
             })
+            if len(final_chunks) >= top_k:
+                break
 
         return final_chunks
 

@@ -16,9 +16,9 @@ class LLMService:
     def __init__(
         self,
         primary_model: str = "qwen2.5:7b",
-        fallback_model: str = "llama3.1:8b",
+        fallback_model: str = "qwen2.5:3b",
         host: str = "http://localhost:11434",
-        timeout: int = 120
+        timeout: int = 180
     ):
         self.primary_model = primary_model
         self.fallback_model = fallback_model
@@ -42,8 +42,9 @@ class LLMService:
 
     def _select_best_available_model(self) -> str:
         installed = self._get_installed_models()
-        # Chuẩn hóa thứ tự 2 model theo thiết kế: Primary -> Fallback
-        for cand in [self.primary_model, self.fallback_model]:
+        # Ưu tiên primary_model (qwen2.5:7b) -> fallback_model (qwen2.5:3b)
+        candidates = [self.primary_model, self.fallback_model]
+        for cand in candidates:
             cand_base = cand.split(":")[0]
             if cand in installed or cand_base in installed:
                 return cand
@@ -56,18 +57,24 @@ class LLMService:
         temperature: float = 0.2,
         format: Optional[str] = None,
         max_tokens: int = 1024,
-        num_ctx: int = 8192
+        num_ctx: int = 4096,
+        preferred_model: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Tạo phản hồi với cơ chế Failover 2 model: Qwen 2.5 7B -> Llama 3.1 8B.
-        num_ctx linh hoạt: 1024 cho RAG/Chat, 2048-4096 cho Tóm tắt.
+        Tạo phản hồi với cơ chế Failover an toàn trên GPU 6GB: Qwen 2.5 7B -> Qwen 2.5 3B.
+        Hỗ trợ preferred_model để chọn chế độ Siêu tốc (3B) hoặc Chuyên sâu (7B).
         """
-        self.active_model = self._select_best_available_model()
-        # Đảm bảo danh sách thử nghiệm chỉ gồm 2 model chuẩn
-        models_to_try = [self.active_model]
-        for m in [self.primary_model, self.fallback_model]:
-            if m not in models_to_try:
-                models_to_try.append(m)
+        if preferred_model:
+            models_to_try = [preferred_model]
+            for m in [self.primary_model, self.fallback_model]:
+                if m not in models_to_try:
+                    models_to_try.append(m)
+        else:
+            self.active_model = self._select_best_available_model()
+            models_to_try = [self.active_model]
+            for m in [self.primary_model, self.fallback_model]:
+                if m not in models_to_try:
+                    models_to_try.append(m)
 
         messages = []
         if system_prompt:
@@ -88,7 +95,7 @@ class LLMService:
                         "num_predict": max_tokens,
                         "top_k": 20,
                         "top_p": 0.85,
-                        "repeat_penalty": 1.1,
+                        "repeat_penalty": 1.18,
                         "num_batch": 256,
                     }
                 }
@@ -124,16 +131,24 @@ class LLMService:
         system_prompt: Optional[str] = None,
         temperature: float = 0.2,
         max_tokens: int = 1024,
-        num_ctx: int = 8192
+        num_ctx: int = 4096,
+        preferred_model: Optional[str] = None
     ):
         """
         Streaming generation - yield từng token kèm tự động failover sang model dự phòng nếu model chính lỗi.
+        Hỗ trợ preferred_model để chọn chế độ Siêu tốc (3B) hoặc Chuyên sâu (7B).
         """
-        self.active_model = self._select_best_available_model()
-        models_to_try = [self.active_model]
-        for m in [self.primary_model, self.fallback_model]:
-            if m not in models_to_try:
-                models_to_try.append(m)
+        if preferred_model:
+            models_to_try = [preferred_model]
+            for m in [self.primary_model, self.fallback_model]:
+                if m not in models_to_try:
+                    models_to_try.append(m)
+        else:
+            self.active_model = self._select_best_available_model()
+            models_to_try = [self.active_model]
+            for m in [self.primary_model, self.fallback_model]:
+                if m not in models_to_try:
+                    models_to_try.append(m)
 
         messages = []
         if system_prompt:
@@ -156,7 +171,7 @@ class LLMService:
                         "num_predict": max_tokens,
                         "top_k": 20,
                         "top_p": 0.85,
-                        "repeat_penalty": 1.1,
+                        "repeat_penalty": 1.18,
                         "num_batch": 256,
                     }
                 )
@@ -182,13 +197,22 @@ class LLMService:
         prompt: str,
         system_prompt: Optional[str] = None,
         max_tokens: int = 2048,
-        num_ctx: int = 8192
+        num_ctx: int = 4096,
+        preferred_model: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Sinh nội dung JSON tốc độ cao.
         """
         sys_p = (system_prompt or "") + "\nBạn BẮT BUỘC chỉ trả về chuỗi JSON hợp lệ, không giải thích dài dòng."
-        res = self.generate(prompt=prompt, system_prompt=sys_p, temperature=0.1, format="json", max_tokens=max_tokens, num_ctx=num_ctx)
+        res = self.generate(
+            prompt=prompt, 
+            system_prompt=sys_p, 
+            temperature=0.1, 
+            format="json", 
+            max_tokens=max_tokens, 
+            num_ctx=num_ctx,
+            preferred_model=preferred_model
+        )
         
         if not res["success"]:
             return {"data": None, "raw": res["text"], "success": False, "model_used": res["model_used"]}

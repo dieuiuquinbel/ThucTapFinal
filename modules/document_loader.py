@@ -101,42 +101,26 @@ def extract_text_from_pdf(file_path: str) -> List[Dict[str, Any]]:
     file_name = unicodedata.normalize('NFC', os.path.basename(file_path))
     
     doc = fitz.open(file_path)
-    raw_pages = []
+    total_doc_chars = sum(len(doc[p].get_text("text").strip()) for p in range(len(doc)))
+    is_digital_pdf = total_doc_chars >= 50
     
+    raw_pages = []
     for page_num in range(len(doc)):
         page = doc[page_num]
         raw_text = page.get_text("text").strip()
         text = unicodedata.normalize('NFC', raw_text)
         
-        # Chỉ chạy OCR khi trang có ít chữ (< 150 ký tự) mà chứa hình ảnh sơ đồ, hoặc cả trang là ảnh scan
-        # Nếu trang đã có đầy đủ văn bản (> 150 ký tự), PyMuPDF đọc ngay lập tức trong 0.01s!
-        if len(text.strip()) < 150:
-            embedded_ocr_texts = []
-            image_list = page.get_images(full=True)
-            if image_list:
-                for img_info in image_list[:2]:  # Chỉ OCR tối đa 2 ảnh lớn nhất trên trang
-                    xref = img_info[0]
-                    base_image = doc.extract_image(xref)
-                    image_bytes = base_image.get("image")
-                    width = base_image.get("width", 0)
-                    height = base_image.get("height", 0)
-                    
-                    # Chỉ OCR các sơ đồ/bảng biểu kích thước lớn (> 200px)
-                    if width >= 200 and height >= 200 and image_bytes:
-                        img_text = ocr_image_bytes(image_bytes)
-                        if img_text:
-                            embedded_ocr_texts.append(img_text)
-            
-            if embedded_ocr_texts:
-                ocr_combined = " ".join(embedded_ocr_texts)
-                text += f"\n\n[NỘI DUNG TỪ HÌNH ẢNH / SƠ ĐỒ]:\n{ocr_combined}"
-            elif len(text.strip()) < 30:
-                # Toàn bộ trang là ảnh scan hoàn toàn
-                pix = page.get_pixmap(dpi=130)
+        # Chỉ chạy OCR khi tài liệu THỰC SỰ là bản scan trắng trơn (không có text layer)
+        # Đối với slide, giáo trình, lab có text layer: PyMuPDF đọc ngay lập tức trong 0.01s!
+        if not is_digital_pdf and len(text.strip()) < 30:
+            try:
+                pix = page.get_pixmap(dpi=120)
                 page_img_bytes = pix.tobytes("png")
                 page_ocr_text = ocr_image_bytes(page_img_bytes)
                 if page_ocr_text:
                     text = f"[VĂN BẢN TỪ BẢN SCAN]:\n{page_ocr_text}"
+            except Exception as e:
+                print(f"[OCR] Lỗi khi xử lý trang scan {page_num + 1}: {e}")
 
         raw_pages.append(text)
     doc.close()

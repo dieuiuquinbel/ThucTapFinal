@@ -23,22 +23,29 @@ export default function Sidebar({
   onOpenAuthModal,
   onLogout,
   onFetchQuizHistory,
-  onNavigateGuidelines
+  onNavigateGuidelines,
+  modelMode,
+  setModelMode,
+  onLogoClick,
+  showAlert
 }) {
   return (
     <aside className="w-80 bg-white border-r border-sky-100 flex flex-col justify-between shrink-0 shadow-sm z-10">
       <div className="p-5 overflow-y-auto">
-        {/* Logo & Brand */}
-        <div className="flex items-center gap-3 mb-5">
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-sky-400 via-blue-500 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-sky-300/40 transform hover:rotate-6 transition-transform">
+        {/* Logo & Brand: Bấm vào logo để quay về tab Chatbot bất kể đang ở tab nào */}
+        <div 
+          onClick={onLogoClick}
+          className="flex items-center gap-3 mb-5 cursor-pointer group select-none transition-transform hover:scale-[1.02]"
+          title="Bấm để quay về Hỏi đáp bài học (Chat)"
+        >
+          <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-sky-400 via-blue-500 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-sky-300/40 transform group-hover:rotate-6 transition-transform">
             <Sparkles className="w-6 h-6 text-yellow-200 fill-yellow-200" />
           </div>
           <div>
             <div className="flex items-center gap-1.5">
-              <h1 className="font-extrabold text-sky-950 text-lg leading-tight tracking-tight">SmartStudy</h1>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">Bé ngoan ✨</span>
+              <h1 className="font-extrabold text-sky-950 text-xl leading-tight tracking-tight group-hover:text-sky-600 transition-colors">StudyEdu</h1>
             </div>
-            <p className="text-xs text-sky-600 font-medium">Bạn cùng tiến học tập 4.0</p>
+            <p className="text-xs text-sky-600 font-semibold">Trợ lý học tập của bạn</p>
           </div>
         </div>
 
@@ -73,13 +80,19 @@ export default function Sidebar({
               {systemStatus?.is_fallback ? 'Đang trực phụ' : 'Sẵn sàng 100%'}
             </span>
           </div>
-          <div className="text-xs font-bold text-sky-950 flex items-center gap-1">
-            <span>🤖 {systemStatus?.active_model || 'Đang kết nối trợ lý...'}</span>
+          <div className="text-xs font-bold text-sky-950 flex items-center justify-between">
+            <span className="truncate">
+              🤖 {modelMode === 'deep' ? 'Qwen 7B (Suy luận sâu)' : 'Qwen 3B (Phản xạ nhanh)'}
+            </span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-extrabold shrink-0 ${
+              modelMode === 'deep' ? 'bg-sky-100 text-sky-800 border border-sky-200' : 'bg-amber-100 text-amber-800 border border-amber-200'
+            }`}>
+              {modelMode === 'deep' ? '🧠 Suy luận' : '⚡ Nhanh'}
+            </span>
           </div>
-          <div className="text-[11px] text-sky-700/80 mt-1 flex items-center gap-2">
-            <span>Nhớ được: {systemStatus?.total_chunks || 0} bài học</span>
-            <span>•</span>
-            <span className="text-emerald-600 font-semibold">Chạy trên máy 100%</span>
+          <div className="text-[11px] text-sky-700/80 mt-1.5 flex items-center justify-between">
+            <span>Đề thi & Tóm tắt: <strong className="text-sky-900">Qwen 7B</strong></span>
+            <span className="text-emerald-600 font-bold">RTX 4050</span>
           </div>
         </div>
 
@@ -225,7 +238,9 @@ export default function Sidebar({
                 <button 
                   onClick={() => {
                     setUserMenuOpen(false);
-                    alert('Ứng dụng di động đang được phát triển!');
+                    if (showAlert) {
+                      showAlert({ title: 'Ứng dụng di động 📱', message: 'Ứng dụng di động StudyEdu đang trong giai đoạn phát triển và sẽ sớm ra mắt!' });
+                    }
                   }}
                   className="w-full px-4 py-2.5 text-left hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2.5 transition-colors cursor-pointer"
                 >
@@ -247,7 +262,9 @@ export default function Sidebar({
                 <button 
                   onClick={() => {
                     setUserMenuOpen(false);
-                    alert('Liên hệ hỗ trợ: support@smartstudy.edu.vn');
+                    if (showAlert) {
+                      showAlert({ title: 'Trợ giúp & Hỗ trợ 💌', message: 'Mọi thắc mắc hoặc góp ý xin gửi về email hỗ trợ:\nsupport@studyedu.edu.vn' });
+                    }
                   }}
                   className="w-full px-4 py-2.5 text-left hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2.5 transition-colors cursor-pointer"
                 >

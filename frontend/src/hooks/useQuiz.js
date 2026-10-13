@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import axios, { API_BASE } from '../api/client';
 
-export function useQuiz({ currentUser } = {}) {
+export function useQuiz({ currentUser, showAlert } = {}) {
   const [quizDoc, setQuizDoc] = useState(() => localStorage.getItem('smartstudy_quiz_doc') || '');
   const [numQuestions, setNumQuestions] = useState(() => Number(localStorage.getItem('smartstudy_quiz_count')) || 5);
   const [quizDifficulty, setQuizDifficulty] = useState(() => localStorage.getItem('smartstudy_quiz_diff') || 'Trung bình');
@@ -26,7 +26,11 @@ export function useQuiz({ currentUser } = {}) {
   const handleGenerateQuiz = async (overrideDifficulty = null, overrideDoc = null, overrideCount = null, shufflePool = false) => {
     const targetDoc = (typeof overrideDoc === 'string' && overrideDoc.trim()) ? overrideDoc : quizDoc;
     if (!targetDoc) {
-      alert('Vui lòng chọn tài liệu để sinh đề!');
+      if (showAlert) {
+        showAlert({ title: 'Chưa chọn bài học 📖', message: 'Vui lòng chọn tài liệu học tập để sinh đề thi trắc nghiệm!', type: 'warning' });
+      } else {
+        alert('Vui lòng chọn tài liệu để sinh đề!');
+      }
       return;
     }
     const targetDiff = (typeof overrideDifficulty === 'string' && overrideDifficulty.trim()) ? overrideDifficulty : quizDifficulty;
@@ -47,10 +51,19 @@ export function useQuiz({ currentUser } = {}) {
         setQuizMeta(res.data);
         setCurrentQuestionIdx(0);
       } else {
-        alert('Mô hình chưa thể sinh JSON trắc nghiệm. Vui lòng bấm thử lại!');
+        if (showAlert) {
+          showAlert({ title: 'Lỗi sinh đề thi ⚠️', message: 'Mô hình chưa thể sinh JSON trắc nghiệm. Vui lòng bấm thử lại!', type: 'warning' });
+        } else {
+          alert('Mô hình chưa thể sinh JSON trắc nghiệm. Vui lòng bấm thử lại!');
+        }
       }
     } catch (err) {
-      alert('Lỗi: ' + (err.response?.data?.detail || err.message));
+      const errMsg = err.response?.data?.detail || err.message;
+      if (showAlert) {
+        showAlert({ title: 'Lỗi kết nối ❌', message: 'Không thể tạo đề thi: ' + errMsg, type: 'error' });
+      } else {
+        alert('Lỗi: ' + errMsg);
+      }
     } finally {
       setQuizLoading(false);
     }

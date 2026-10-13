@@ -99,7 +99,8 @@ class DocumentSummarizer:
         self,
         text_content: str,
         document_title: str = "Tài liệu",
-        summary_style: str = "Trung bình"
+        summary_style: str = "Trung bình",
+        preferred_model: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Tóm tắt tài liệu có tích hợp Cache siêu tốc (0.1s khi đã có cache).
@@ -146,7 +147,8 @@ Dựa vào nội dung trên, hãy viết bản tóm tắt học tập hoàn ch�
             prompt=prompt, 
             system_prompt=system_prompt,
             max_tokens=max_toks,
-            num_ctx=4096
+            num_ctx=4096,
+            preferred_model=preferred_model
         )
 
         res["document_title"] = document_title

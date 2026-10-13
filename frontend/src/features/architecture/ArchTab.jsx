@@ -38,7 +38,7 @@ export default function ArchTab() {
          │             │
          └──────┬──────┘
                 ▼ (Gộp Context + Prompt Tiếng Việt)
-   [LOCAL LLM (Ollama - Qwen 2.5 7B / Dự phòng: Llama 3.1 8B)]
+   [LOCAL LLM (Ollama - Qwen 2.5 7B / Dự phòng: Qwen 2.5 3B)]
                 │
                 ▼
    1. Trả lời câu hỏi kèm trích dẫn số trang chính xác
@@ -60,8 +60,8 @@ export default function ArchTab() {
           </div>
           <div className="p-4 rounded-2xl bg-amber-50/60 border border-amber-200/80">
             <span className="text-amber-700 block mb-1 font-bold">Mô hình AI dự phòng</span>
-            <span className="font-extrabold text-amber-950 text-sm">Llama 3.1 8B (Ollama)</span>
-            <p className="text-amber-700 mt-1 font-medium">Tự động hỗ trợ ngay khi mô hình chính bận việc.</p>
+            <span className="font-extrabold text-amber-950 text-sm">Qwen 2.5 3B (Ollama)</span>
+            <p className="text-amber-700 mt-1 font-medium">Siêu nhẹ (~1.9GB), phản hồi tức thì, không gây tràn VRAM.</p>
           </div>
           <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-200/80">
             <span className="text-emerald-700 block mb-1 font-bold">Bộ nhớ ngữ nghĩa</span>

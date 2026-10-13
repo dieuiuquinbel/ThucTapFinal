@@ -7,7 +7,22 @@ export const DEFAULT_WELCOME_MESSAGE = {
   sources: []
 };
 
-export function useChat({ selectedDocFilter, systemStatus } = {}) {
+export function useChat({ selectedDocFilter, systemStatus, showConfirm } = {}) {
+  const [modelMode, setModelModeState] = useState(() => {
+    try {
+      return localStorage.getItem('smartstudy_model_mode') || 'deep';
+    } catch (_) {
+      return 'deep';
+    }
+  });
+
+  const setModelMode = (mode) => {
+    setModelModeState(mode);
+    try {
+      localStorage.setItem('smartstudy_model_mode', mode);
+    } catch (_) {}
+  };
+
   const [messages, setMessages] = useState(() => {
     try {
       const saved = localStorage.getItem('smartstudy_chat_history');
@@ -39,15 +54,29 @@ export function useChat({ selectedDocFilter, systemStatus } = {}) {
   }, [messages, chatLoading]);
 
   const handleNewChat = () => {
+    const doClear = () => {
+      setMessages([DEFAULT_WELCOME_MESSAGE]);
+      try {
+        localStorage.removeItem('smartstudy_chat_history');
+      } catch (_) {}
+    };
+
     if (messages.length > 1) {
-      if (!window.confirm('Bạn có muốn làm mới ngữ cảnh và bắt đầu cuộc trò chuyện mới không?')) {
+      if (showConfirm) {
+        showConfirm({
+          title: 'Hỏi bài học mới 💬',
+          message: 'Bạn có muốn làm mới ngữ cảnh và bắt đầu cuộc trò chuyện mới không?',
+          confirmText: 'Bắt đầu mới',
+          cancelText: 'Giữ lại',
+          confirmVariant: 'primary',
+          onConfirm: doClear
+        });
+        return;
+      } else if (!window.confirm('Bạn có muốn làm mới ngữ cảnh và bắt đầu cuộc trò chuyện mới không?')) {
         return;
       }
     }
-    setMessages([DEFAULT_WELCOME_MESSAGE]);
-    try {
-      localStorage.removeItem('smartstudy_chat_history');
-    } catch (_) {}
+    doClear();
   };
 
   const handleSendMessage = async (e) => {
@@ -73,7 +102,8 @@ export function useChat({ selectedDocFilter, systemStatus } = {}) {
           query: q,
           filter_source: selectedDocFilter,
           top_k: 4,
-          history: recentHistory
+          history: recentHistory,
+          model_mode: modelMode
         })
       });
 
@@ -152,13 +182,25 @@ export function useChat({ selectedDocFilter, systemStatus } = {}) {
           } catch (_) {}
         }
       }
+
+      // Kích hoạt nạp ngầm Quiz & Tóm tắt trong lúc học viên rảnh tay đọc câu trả lời (sau 2.5s)
+      const targetDoc = (selectedDocFilter && selectedDocFilter !== 'Tất cả tài liệu')
+        ? selectedDocFilter
+        : (metaSources[0]?.source || null);
+
+      if (targetDoc) {
+        setTimeout(() => {
+          axios.post(`${API_BASE}/precompute/${encodeURIComponent(targetDoc)}`).catch(() => {});
+        }, 2500);
+      }
     } catch (err) {
       try {
         const res = await axios.post(`${API_BASE}/chat`, {
           query: q,
           filter_source: selectedDocFilter,
           top_k: 4,
-          history: recentHistory
+          history: recentHistory,
+          model_mode: modelMode
         });
         setMessages(prev => [
           ...prev,
@@ -195,6 +237,8 @@ export function useChat({ selectedDocFilter, systemStatus } = {}) {
     setOpenSources,
     chatBottomRef,
     handleNewChat,
-    handleSendMessage
+    handleSendMessage,
+    modelMode,
+    setModelMode
   };
 }

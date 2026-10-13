@@ -1,7 +1,16 @@
 import { useState, useEffect } from 'react';
 import axios, { API_BASE, setAuthTokenHeader } from '../api/client';
 
-export function useAuth() {
+export function useAuth(options = {}) {
+  const { showAlert } = options;
+  const triggerAlert = (message, title = 'Thông báo', icon = 'info') => {
+    if (showAlert) {
+      showAlert(message, { title, icon });
+    } else {
+      alert(message);
+    }
+  };
+
   const [authToken, setAuthToken] = useState(() => localStorage.getItem('smartstudy_token') || '');
   const [currentUser, setCurrentUser] = useState(() => {
     try {
@@ -45,7 +54,7 @@ export function useAuth() {
             localStorage.setItem('smartstudy_user', JSON.stringify(user));
           } catch (_) {}
           setAuthModalOpen(false);
-          alert(`Chào mừng bạn ${user.full_name} quay trở lại học tập! 🌟`);
+          triggerAlert(`Chào mừng bạn ${user.full_name} quay trở lại học tập! 🌟`, 'Đăng nhập thành công', 'success');
         }
       } else if (authMode === 'register') {
         const res = await axios.post(`${API_BASE}/auth/register`, {
@@ -59,7 +68,7 @@ export function useAuth() {
             setDevOtpHit(res.data.data.dev_otp);
           }
           setAuthMode('verify');
-          alert('Đã gửi mã xác nhận! Vui lòng nhập mã OTP để kích hoạt tài khoản.');
+          triggerAlert('Đã gửi mã xác nhận! Vui lòng nhập mã OTP để kích hoạt tài khoản.', 'Xác thực tài khoản', 'info');
         }
       } else if (authMode === 'verify') {
         const res = await axios.post(`${API_BASE}/auth/verify-otp`, {
@@ -75,11 +84,11 @@ export function useAuth() {
             localStorage.setItem('smartstudy_user', JSON.stringify(user));
           } catch (_) {}
           setAuthModalOpen(false);
-          alert(`Kích hoạt tài khoản thành công! Chào bạn ${user.full_name} ✨`);
+          triggerAlert(`Kích hoạt tài khoản thành công! Chào bạn ${user.full_name} ✨`, 'Kích hoạt thành công', 'success');
         }
       }
     } catch (err) {
-      alert('Lỗi: ' + (err.response?.data?.detail || err.message));
+      triggerAlert('Lỗi: ' + (err.response?.data?.detail || err.message), 'Thất bại', 'error');
     } finally {
       setAuthLoading(false);
     }
@@ -93,7 +102,7 @@ export function useAuth() {
       localStorage.removeItem('smartstudy_token');
       localStorage.removeItem('smartstudy_user');
     } catch (_) {}
-    alert('Đã đăng xuất tài khoản thành công!');
+    triggerAlert('Đã đăng xuất tài khoản thành công!', 'Đăng xuất', 'info');
   };
 
   const handleFetchQuizHistory = async () => {
@@ -106,7 +115,7 @@ export function useAuth() {
         setUserMenuOpen(false);
       }
     } catch (err) {
-      alert('Không thể tải lịch sử điểm: ' + (err.response?.data?.detail || err.message));
+      triggerAlert('Không thể tải lịch sử điểm: ' + (err.response?.data?.detail || err.message), 'Lỗi tải lịch sử', 'error');
     }
   };
 

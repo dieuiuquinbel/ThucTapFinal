@@ -33,8 +33,8 @@ SECTION_HEADING_REGEX = re.compile(
 
 def chunk_document_pages(
     pages_data: List[Dict[str, Any]], 
-    chunk_size: int = 1200, 
-    chunk_overlap: int = 200
+    chunk_size: int = 800, 
+    chunk_overlap: int = 150
 ) -> List[Dict[str, Any]]:
     """
     Cắt nhỏ văn bản theo phân cấp tiêu đề mục (Structure-Aware Chunking).
